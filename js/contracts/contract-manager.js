@@ -124,6 +124,10 @@ export class ContractManager {
     return this.signer;
   }
 
+  getProvider() {
+    return this.provider || this.readOnlyProvider;
+  }
+
   async getNextLockId() {
     const contract = this.getReadContract();
     if (!contract) return null;

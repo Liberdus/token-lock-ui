@@ -1,11 +1,6 @@
 import { CONFIG } from './config.js';
 import { Header } from './components/header.js';
-import { TabBar } from './components/tab-bar.js';
-import { LockTab } from './components/lock-tab.js';
-import { UnlockTab } from './components/unlock-tab.js';
-import { WithdrawTab } from './components/withdraw-tab.js';
-import { RetractTab } from './components/retract-tab.js';
-import { OverviewTab } from './components/overview-tab.js';
+import { LocksPage } from './components/locks-page.js';
 import { ToastManager } from './components/toast-manager.js';
 import { WalletManager } from './wallet/wallet-manager.js';
 import { NetworkManager } from './wallet/network-manager.js';
@@ -14,12 +9,7 @@ import { ContractManager } from './contracts/contract-manager.js';
 
 // Instantiate globally (web-client-v2 pattern)
 const header = new Header();
-const tabBar = new TabBar();
-const lockTab = new LockTab();
-const unlockTab = new UnlockTab();
-const withdrawTab = new WithdrawTab();
-const retractTab = new RetractTab();
-const overviewTab = new OverviewTab();
+const locksPage = new LocksPage();
 const toastManager = new ToastManager();
 const walletManager = new WalletManager();
 const networkManager = new NetworkManager({ walletManager });
@@ -52,11 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   header.load();
 
-  lockTab.load();
-  unlockTab.load();
-  withdrawTab.load();
-  retractTab.load();
-  overviewTab.load();
+  locksPage.load();
 
   const clearBtn = document.getElementById('app-clear-cache');
   clearBtn?.addEventListener('click', () => {
