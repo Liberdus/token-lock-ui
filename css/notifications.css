@@ -1,0 +1,219 @@
+/**
+ * Unified Notification System Styles
+ * Matches overall design pattern with light theme
+ */
+
+/* Container */
+.notification-container {
+  position: fixed;
+  top: 15%;
+  left: 50%;
+  transform: translate(-50%, 0);
+  z-index: 1000004;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 380px;
+  width: 85%;
+  pointer-events: none;
+  -webkit-transform: translate3d(-50%, 0, 0);
+  transform: translate3d(-50%, 0, 0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-perspective: 1000;
+  perspective: 1000;
+}
+
+/* Notification Card */
+.notification {
+  background: var(--background-color);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: var(--elev-2);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transform: translateY(-20px);
+  opacity: 0;
+  transition: all 0.3s ease;
+  pointer-events: auto;
+  position: relative;
+  overflow: hidden;
+  min-width: 300px;
+  text-align: center;
+  margin: 0 auto;
+  -webkit-transform: translateY(-20px) translate3d(0, 0, 0);
+  transform: translateY(-20px) translate3d(0, 0, 0);
+  -webkit-transition: all 0.3s ease;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-perspective: 1000;
+  perspective: 1000;
+  will-change: transform, opacity;
+}
+
+/* Accent Border */
+.notification::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: currentColor;
+}
+
+/* Animation States */
+.notification.show {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+.notification.hide {
+  transform: translateY(-20px);
+  opacity: 0;
+}
+
+/* Type Colors */
+.notification.success {
+  color: var(--success-color);
+}
+
+.notification.error {
+  color: var(--danger-color);
+}
+
+.notification.warning {
+  color: var(--warning-color);
+}
+
+.notification.info {
+  color: var(--info-color);
+}
+
+.notification.loading {
+  color: var(--primary-color);
+}
+
+/* Icon */
+.notification-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+/* CSS-based spinner for loading icon */
+.notification-icon .spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Content */
+.notification-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-title {
+  font-weight: var(--font-weight-semibold);
+  font-size: 13px;
+  color: var(--text-color);
+  margin: 0 0 2px 0;
+  line-height: 1.4;
+}
+
+.notification-message {
+  font-size: 12px;
+  color: var(--secondary-text-color);
+  margin: 0;
+  line-height: 1.4;
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+.notification-message a {
+  color: #0066cc;
+  text-decoration: underline;
+  word-break: break-all;
+  transition: opacity 0.2s ease;
+}
+
+.notification-message a:hover {
+  color: #0052a3;
+  opacity: 1;
+}
+
+/* Close Button */
+.notification-close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: var(--hover-background);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--secondary-text-color);
+  transition: all 0.2s ease;
+  font-size: 16px;
+}
+
+.notification-close:hover {
+  background: var(--button-hover-background);
+  color: var(--text-color);
+  transform: scale(1.05);
+}
+
+/* Responsive - Mobile */
+@media (max-width: 480px) {
+  .notification-container {
+    top: 20px;
+    left: 50%;
+    width: calc(100% - 40px);
+    max-width: none;
+  }
+}
+
+/* Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .notification {
+    transition: opacity 0.2s ease;
+    transform: none !important;
+  }
+
+  .notification.show {
+    opacity: 1;
+    animation: none;
+  }
+
+  .notification.hide {
+    opacity: 0;
+  }
+}

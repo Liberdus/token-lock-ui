@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#ffffff" />
+
+    <title>Liberdus Token Lock</title>
+
+    <link rel="icon" type="image/png" href="./assets/logo.png" />
+
+    <link rel="stylesheet" href="./css/base.css" />
+    <link rel="stylesheet" href="./css/header.css" />
+    <link rel="stylesheet" href="./css/tabs.css" />
+    <link rel="stylesheet" href="./css/wallet-popup.css" />
+    <link rel="stylesheet" href="./css/notifications.css" />
+  </head>
+
+  <body>
+    <!-- Libraries (non-module) -->
+    <script src="./libs/ethers.umd.min.js"></script>
+
+    <!-- Follow web-client-v2 pattern: load app script early, initialize on DOMContentLoaded -->
+    <script src="./js/app.js" type="module"></script>
+
+    <div class="container" id="app">
+      <header class="header" id="header">
+        <div class="header-toolbar">
+          <a
+            href="https://liberdus.com"
+            target="_blank"
+            rel="noopener"
+            class="logo-link"
+            aria-label="Visit Liberdus website"
+          >
+            <img class="logo" src="./assets/logo.png" alt="Liberdus logo" />
+          </a>
+          <div class="logo-text">
+            <div class="app-title">Liberdus Token Lock <span class="app-version"></span></div>
+            <div class="app-subtitle">Time-locked ERC20 vesting</div>
+          </div>
+
+          <nav class="nav-section" aria-label="Header actions">
+            <button
+              id="connect-wallet-btn"
+              class="connect-wallet-btn"
+              type="button"
+              title="Connect MetaMask (Polygon Amoy)"
+            >
+              Connect Wallet
+            </button>
+          </nav>
+        </div>
+      </header>
+
+      <main class="main" id="main-content">
+        <section class="tabs" aria-label="Main tabs">
+          <div class="tab-bar" role="tablist" aria-label="Liberdus Token UI tabs">
+            <button
+              class="tab-button is-active"
+              role="tab"
+              aria-selected="true"
+              aria-controls="tab-panel-lock"
+              id="tab-lock"
+              data-tab="lock"
+              type="button"
+            >
+              Lock
+            </button>
+            <button
+              class="tab-button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="tab-panel-unlock"
+              id="tab-unlock"
+              data-tab="unlock"
+              type="button"
+            >
+              Unlock
+            </button>
+            <button
+              class="tab-button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="tab-panel-withdraw"
+              id="tab-withdraw"
+              data-tab="withdraw"
+              type="button"
+            >
+              Withdraw
+            </button>
+            <button
+              class="tab-button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="tab-panel-retract"
+              id="tab-retract"
+              data-tab="retract"
+              type="button"
+            >
+              Retract
+            </button>
+            <button
+              class="tab-button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="tab-panel-overview"
+              id="tab-overview"
+              data-tab="overview"
+              type="button"
+            >
+              Overview
+            </button>
+          </div>
+
+          <div class="tab-panels">
+            <section
+              class="tab-panel is-active"
+              id="tab-panel-lock"
+              role="tabpanel"
+              aria-labelledby="tab-lock"
+              tabindex="0"
+              data-panel="lock"
+            >
+              <!-- Filled by js/components/lock-tab.js -->
+            </section>
+
+            <section
+              class="tab-panel"
+              id="tab-panel-unlock"
+              role="tabpanel"
+              aria-labelledby="tab-unlock"
+              tabindex="0"
+              hidden
+              data-panel="unlock"
+            >
+              <!-- Filled by js/components/unlock-tab.js -->
+            </section>
+
+            <section
+              class="tab-panel"
+              id="tab-panel-withdraw"
+              role="tabpanel"
+              aria-labelledby="tab-withdraw"
+              tabindex="0"
+              hidden
+              data-panel="withdraw"
+            >
+              <!-- Filled by js/components/withdraw-tab.js -->
+            </section>
+
+            <section
+              class="tab-panel"
+              id="tab-panel-retract"
+              role="tabpanel"
+              aria-labelledby="tab-retract"
+              tabindex="0"
+              hidden
+              data-panel="retract"
+            >
+              <!-- Filled by js/components/retract-tab.js -->
+            </section>
+
+            <section
+              class="tab-panel"
+              id="tab-panel-overview"
+              role="tabpanel"
+              aria-labelledby="tab-overview"
+              tabindex="0"
+              hidden
+              data-panel="overview"
+            >
+              <!-- Filled by js/components/overview-tab.js -->
+            </section>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="footer-inner">
+          <div class="footer-left">
+            <span>© Liberdus</span>
+            <span class="footer-sep">•</span>
+            <a
+              href="https://github.com/Liberdus"
+              target="_blank"
+              rel="noopener"
+            >GitHub</a>
+          </div>
+          <button type="button" class="btn btn--ghost btn--footer" id="app-clear-cache" title="Clear cached data">Clear cache</button>
+        </div>
+      </footer>
+
+      <!-- Phase 2+ -->
+      <div id="notification-container" class="notification-container"></div>
+    </div>
+
+    <!-- Phase 2+ -->
+    <div id="wallet-popup-container"></div>
+  </body>
+</html>

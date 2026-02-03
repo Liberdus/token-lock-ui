@@ -1,0 +1,62 @@
+/* ============================================================
+   tabs.css (Phase 1)
+   - Desktop-first, mobile-ready
+   ============================================================ */
+
+.tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tab-bar {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--hover-background);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+}
+
+.tab-button {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--secondary-text-color);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.tab-button:hover:not(:disabled) {
+  background: var(--button-hover-background);
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
+
+.tab-button.is-active {
+  background: var(--background-color);
+  border-color: var(--border-color);
+  color: var(--text-color);
+  box-shadow: var(--elev-1);
+}
+
+.tab-panels {
+  min-height: 320px;
+}
+
+.tab-panel {
+  outline: none;
+}
+
+.tab-panel.is-active {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .tab-panels {
+    min-height: auto;
+  }
+}
+

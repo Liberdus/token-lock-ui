@@ -1,0 +1,131 @@
+/* ============================================================
+   wallet-popup.css
+   Phase 2: wallet popup styling (simple)
+   ============================================================ */
+
+.wallet-popup {
+  position: fixed;
+  background: var(--background-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--overlay-shadow);
+  width: 280px;
+  z-index: var(--overlay-z-index-high);
+  color: var(--text-color);
+}
+
+.wallet-popup-content {
+  padding: 14px;
+  position: relative;
+}
+
+.wallet-popup-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--secondary-text-color);
+}
+
+.wallet-popup-close:hover {
+  background: var(--hover-background);
+  border-color: var(--border-color);
+  color: var(--text-color);
+}
+
+.wallet-balance {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  padding: 8px 0 12px;
+}
+
+.balance-label {
+  font-size: var(--font-size-xs);
+  color: var(--secondary-text-color);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.balance-value {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.wallet-address {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  background: var(--hover-background);
+}
+
+.address-text {
+  font-family: var(--font-monospace);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  user-select: none;
+}
+
+.copy-icon-button {
+  border: 1px solid var(--border-color);
+  background: var(--background-color);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+}
+
+.copy-icon-button:hover {
+  background: var(--hover-background);
+}
+
+.wallet-actions {
+  display: flex;
+  margin-top: 12px;
+}
+
+.disconnect-button {
+  width: 100%;
+  border: 1px solid var(--border-color);
+  background: rgba(220, 53, 69, 0.08);
+  color: var(--danger-color);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  font-weight: var(--font-weight-medium);
+}
+
+.disconnect-button:hover {
+  background: rgba(220, 53, 69, 0.14);
+  border-color: var(--danger-color);
+}
+
+/* Copy Animation */
+.copy-icon-button.success {
+  color: var(--success-color);
+  background: rgba(40, 167, 69, 0.15);
+  border-color: var(--success-color);
+}
+
+.address-text.copied {
+  color: var(--success-color);
+  animation: copyPulse 0.3s ease;
+}
+
+@keyframes copyPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
