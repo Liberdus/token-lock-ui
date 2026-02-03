@@ -55,6 +55,25 @@
   will-change: transform, opacity;
 }
 
+.notification.notification--form {
+  max-width: 680px;
+  width: min(92vw, 680px);
+  text-align: left;
+  align-items: flex-start;
+}
+
+.notification.notification--form .notification-message {
+  text-align: left;
+}
+
+.notification.notification--form .form-grid {
+  margin-top: 0;
+}
+
+.notification.notification--form .actions {
+  margin-top: 12px;
+}
+
 /* Accent Border */
 .notification::before {
   content: '';

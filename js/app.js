@@ -1,6 +1,10 @@
 import { CONFIG } from './config.js';
 import { Header } from './components/header.js';
-import { LocksPage } from './components/locks-page.js';
+import { TabBar } from './components/tab-bar.js';
+import { OverviewTab } from './components/overview-tab.js';
+import { LockTab } from './components/lock-tab.js';
+import { LockActionToasts } from './components/unlock-tab.js';
+import { ParametersTab } from './components/parameters-tab.js';
 import { ToastManager } from './components/toast-manager.js';
 import { WalletManager } from './wallet/wallet-manager.js';
 import { NetworkManager } from './wallet/network-manager.js';
@@ -9,7 +13,11 @@ import { ContractManager } from './contracts/contract-manager.js';
 
 // Instantiate globally (web-client-v2 pattern)
 const header = new Header();
-const locksPage = new LocksPage();
+const tabBar = new TabBar();
+const overviewTab = new OverviewTab();
+const lockTab = new LockTab();
+const lockActionToasts = new LockActionToasts();
+const parametersTab = new ParametersTab();
 const toastManager = new ToastManager();
 const walletManager = new WalletManager();
 const networkManager = new NetworkManager({ walletManager });
@@ -32,6 +40,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.walletPopup = walletPopup;
   window.contractManager = contractManager;
   window.toastManager = toastManager;
+  window.tabBar = tabBar;
+  window.lockActionToasts = lockActionToasts;
 
   toastManager.load();
   walletManager.load();
@@ -42,7 +52,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   header.load();
 
-  locksPage.load();
+  overviewTab.load();
+  lockTab.load();
+  lockActionToasts.load();
+  parametersTab.load();
 
   const clearBtn = document.getElementById('app-clear-cache');
   clearBtn?.addEventListener('click', () => {

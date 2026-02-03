@@ -198,6 +198,219 @@ textarea:focus-visible {
   gap: 8px;
 }
 
+/* Lock cards */
+.lock-card {
+  margin-bottom: 12px;
+  padding: 16px;
+}
+
+.lock-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.lock-title {
+  margin: 0 0 4px 0;
+  font-size: var(--font-size-lg);
+}
+
+.lock-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lock-progress {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--hover-background);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+
+.lock-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--font-size-sm);
+  margin-bottom: 8px;
+}
+
+.lock-progress-value {
+  color: var(--secondary-text-color);
+}
+
+.lock-progress-bar {
+  height: 8px;
+  background: var(--input-background);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.lock-progress-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-color), var(--primary-muted));
+}
+
+.lock-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.lock-group {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  background: #fff;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.lock-group-title {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  color: var(--secondary-text-color);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 2px;
+}
+
+.lock-kv {
+  display: grid;
+  gap: 2px;
+}
+
+.lock-kv .field-label {
+  margin: 0;
+  line-height: 1.2;
+}
+
+.lock-kv .field-input {
+  margin-top: 2px;
+}
+
+.lock-address {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+}
+
+.icon-copy {
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Pagination bar */
+.pagination-card {
+  padding: 10px 12px;
+  background: var(--hover-background);
+}
+
+.pagination-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pagination-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pagination-select {
+  min-width: 120px;
+  height: 40px;
+  line-height: 40px;
+  padding: 6px 12px;
+}
+
+.pagination-count {
+  font-size: var(--font-size-sm);
+  color: var(--secondary-text-color);
+}
+
+.pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Lock filters layout */
+.lock-filters {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.2fr;
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.lock-filter-group {
+  display: grid;
+  gap: 6px;
+}
+
+.lock-filter-options {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.lock-filter-option {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: var(--font-size-sm);
+}
+
+.lock-filter-field {
+  display: grid;
+  gap: 6px;
+}
+
+.lock-filter-input {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .lock-filters {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .lock-progress-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 .footer-left {
   display: flex;
   align-items: center;

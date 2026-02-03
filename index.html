@@ -57,7 +57,68 @@
       </header>
 
       <main class="main" id="main-content">
-        <section id="locks-page"></section>
+        <section class="tabs" id="tabs">
+          <div class="tab-bar" role="tablist" aria-label="Token lock sections">
+            <button
+              class="tab-button is-active"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="panel-overview"
+              data-tab="overview"
+            >
+              Overview
+            </button>
+            <button
+              class="tab-button"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="panel-lock"
+              data-tab="lock"
+              tabindex="-1"
+            >
+              Lock
+            </button>
+            <button
+              class="tab-button"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="panel-parameters"
+              data-tab="parameters"
+              tabindex="-1"
+            >
+              Parameters
+            </button>
+          </div>
+
+          <div class="tab-panels">
+            <section
+              class="tab-panel is-active"
+              id="panel-overview"
+              data-panel="overview"
+              role="tabpanel"
+              tabindex="0"
+            ></section>
+            <section
+              class="tab-panel"
+              id="panel-lock"
+              data-panel="lock"
+              role="tabpanel"
+              tabindex="0"
+              hidden
+            ></section>
+            <section
+              class="tab-panel"
+              id="panel-parameters"
+              data-panel="parameters"
+              role="tabpanel"
+              tabindex="0"
+              hidden
+            ></section>
+          </div>
+        </section>
       </main>
 
       <footer class="footer">
