@@ -21,18 +21,19 @@ export class ToastManager {
     this.container.setAttribute('aria-relevant', 'additions');
   }
 
-  show({ title, message, type = 'info', timeoutMs, id, dismissible = true, delayMs = 0, allowHtml = false } = {}) {
+  show({ title, message, type = 'info', timeoutMs, id, dismissible = true, delayMs = 0, allowHtml = false, className = '' } = {}) {
     const toastId = id || `t${this._nextId++}`;
 
     // If already exists, update instead.
     if (this._toasts.has(toastId)) {
-      this.update(toastId, { title, message, type, timeoutMs, dismissible, allowHtml });
+      this.update(toastId, { title, message, type, timeoutMs, dismissible, allowHtml, className });
       return toastId;
     }
 
     const create = () => {
       const el = document.createElement('div');
-      el.className = `notification ${type}`;
+      const extraClass = className ? ` ${className}` : '';
+      el.className = `notification ${type}${extraClass}`;
       el.setAttribute('data-toast-id', toastId);
       el.setAttribute('role', type === 'error' ? 'alert' : 'status');
 
@@ -103,7 +104,7 @@ export class ToastManager {
     return this.show({ id, title, message, type: 'error', timeoutMs, dismissible: true, allowHtml });
   }
 
-  update(id, { title, message, type, timeoutMs, dismissible, allowHtml = false } = {}) {
+  update(id, { title, message, type, timeoutMs, dismissible, allowHtml = false, className = '' } = {}) {
     const rec = this._toasts.get(id);
     if (!rec) return false;
 
@@ -111,15 +112,17 @@ export class ToastManager {
     if (!rec.el && rec.showTimerId) {
       window.clearTimeout(rec.showTimerId);
       this._toasts.delete(id);
-      this.show({ id, title, message, type, timeoutMs, dismissible, delayMs: 0, allowHtml });
+      this.show({ id, title, message, type, timeoutMs, dismissible, delayMs: 0, allowHtml, className });
       return true;
     }
 
     const el = rec.el;
     if (!el) return false;
 
-    if (type) {
-      el.className = `notification ${type}`;
+    if (type || className) {
+      const extraClass = className ? ` ${className}` : '';
+      const nextType = type || el.className.split(' ').find((c) => c !== 'notification' && c !== className) || 'info';
+      el.className = `notification ${nextType}${extraClass}`;
       el.setAttribute('role', type === 'error' ? 'alert' : 'status');
       // Update icon
       const iconMap = {
@@ -189,29 +192,66 @@ export class ToastManager {
       if (node.nodeType !== Node.ELEMENT_NODE) return;
 
       const tag = node.tagName.toLowerCase();
-      if (tag === 'a') {
-        const a = document.createElement('a');
-        const href = node.getAttribute('href') || '';
-        if (href && !/^javascript:/i.test(href)) {
-          a.setAttribute('href', href);
-        } else {
-          a.setAttribute('href', '#');
-        }
-        if (node.getAttribute('target') === '_blank') {
-          a.setAttribute('target', '_blank');
-        }
-        a.setAttribute('rel', 'noopener noreferrer');
-        a.textContent = node.textContent || '';
-        parent.appendChild(a);
+      const allowlisted = new Set(['a', 'br', 'div', 'span', 'label', 'input', 'button', 'select', 'option', 'code']);
+      if (!allowlisted.has(tag)) {
+        parent.appendChild(document.createTextNode(node.textContent || ''));
         return;
       }
-      
+
       if (tag === 'br') {
         parent.appendChild(document.createElement('br'));
         return;
       }
 
-      parent.appendChild(document.createTextNode(node.textContent || ''));
+      const el = document.createElement(tag);
+
+      if (tag === 'a') {
+        const href = node.getAttribute('href') || '';
+        if (href && !/^javascript:/i.test(href)) {
+          el.setAttribute('href', href);
+        } else {
+          el.setAttribute('href', '#');
+        }
+        if (node.getAttribute('target') === '_blank') {
+          el.setAttribute('target', '_blank');
+        }
+        el.setAttribute('rel', 'noopener noreferrer');
+      }
+
+      const allowedAttrs = new Set([
+        'class',
+        'id',
+        'type',
+        'value',
+        'placeholder',
+        'min',
+        'max',
+        'step',
+        'readonly',
+        'disabled',
+        'for',
+        'name',
+        'aria-label',
+        'aria-describedby',
+      ]);
+
+      for (const attr of Array.from(node.attributes || [])) {
+        const name = attr.name;
+        if (allowedAttrs.has(name) || name.startsWith('data-') || name.startsWith('aria-')) {
+          el.setAttribute(name, attr.value);
+        }
+      }
+
+      if (tag === 'select' || tag === 'div' || tag === 'label' || tag === 'span') {
+        node.childNodes.forEach((child) => appendSanitized(child, el));
+        if (!el.childNodes.length) {
+          el.textContent = node.textContent || '';
+        }
+      } else if (tag === 'button' || tag === 'option' || tag === 'code') {
+        el.textContent = node.textContent || '';
+      }
+
+      parent.appendChild(el);
     };
 
     container.childNodes.forEach((node) => appendSanitized(node, fragment));

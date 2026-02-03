@@ -28,7 +28,7 @@ export class TabBar {
 
   applyHash() {
     const hash = (window.location.hash || '').replace(/^#/, '').trim();
-    const next = hash && this.tabPanelsByName.has(hash) ? hash : 'lock';
+    const next = hash && this.tabPanelsByName.has(hash) ? hash : 'overview';
     this.switchTab(next, { updateHash: false, focusPanel: false });
   }
 
