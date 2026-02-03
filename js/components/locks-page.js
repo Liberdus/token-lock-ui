@@ -283,48 +283,26 @@ export class LocksPage {
   async refreshLocks() {
     if (this._scanInFlight) return;
     this._scanInFlight = true;
-    this._setStatus('Scanning logs...');
+    this._setStatus('Loading active locks...');
 
     try {
-      const provider = window.contractManager.getReadContract()?.provider || window.contractManager.getProvider?.();
-      const contract = window.contractManager.getReadContract();
-      if (!provider || !contract) throw new Error('Provider not ready');
+      const count = await window.contractManager.getActiveLockCount();
+      if (count == null) throw new Error('Contract not ready');
 
-      const latest = await provider.getBlockNumber();
-      const fromBlock = CONFIG?.CONTRACT?.DEPLOYMENT_BLOCK || 0;
-      const chunk = 5000;
-      const iface = contract.interface;
-      const eventTopic = iface.getEventTopic('LockCreated');
-
-      const lockIds = new Set();
-
-      for (let start = fromBlock; start <= latest; start += chunk + 1) {
-        const end = Math.min(latest, start + chunk);
-        this._setStatus(`Scanning blocks ${start} - ${end}...`);
-        const logs = await provider.getLogs({
-          address: CONFIG.CONTRACT.ADDRESS,
-          fromBlock: start,
-          toBlock: end,
-          topics: [eventTopic],
-        });
-        logs.forEach((log) => {
-          try {
-            const parsed = iface.parseLog(log);
-            if (parsed?.args?.lockId != null) {
-              lockIds.add(parsed.args.lockId.toString());
-            }
-          } catch {
-            // ignore
-          }
-        });
+      const ids = [];
+      const pageSize = 50;
+      for (let offset = 0; offset < count; offset += pageSize) {
+        this._setStatus(`Loading locks ${offset + 1} - ${Math.min(count, offset + pageSize)}...`);
+        const batch = await window.contractManager.getActiveLockIds(offset, pageSize);
+        ids.push(...batch);
       }
 
-      await this._loadLocks(Array.from(lockIds).map((v) => Number(v)));
+      await this._loadLocks(ids);
       this._setStatus(`Loaded ${this._locks.length} locks.`);
     } catch (err) {
-      const msg = normalizeErrorMessage(extractErrorMessage(err, 'Failed to scan locks'));
-      window.toastManager?.error(msg, { title: 'Scan failed' });
-      this._setStatus('Scan failed.');
+      const msg = normalizeErrorMessage(extractErrorMessage(err, 'Failed to load locks'));
+      window.toastManager?.error(msg, { title: 'Load failed' });
+      this._setStatus('Load failed.');
     } finally {
       this._scanInFlight = false;
     }

@@ -135,6 +135,20 @@ export class ContractManager {
     return Number(v.toString());
   }
 
+  async getActiveLockCount() {
+    const contract = this.getReadContract();
+    if (!contract) return null;
+    const v = await contract.getActiveLockCount();
+    return Number(v.toString());
+  }
+
+  async getActiveLockIds(offset, limit) {
+    const contract = this.getReadContract();
+    if (!contract) return [];
+    const ids = await contract.getActiveLockIds(offset, limit);
+    return ids.map((v) => Number(v.toString()));
+  }
+
   async getLock(lockId) {
     const contract = this.getReadContract();
     if (!contract) return null;
