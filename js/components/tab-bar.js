@@ -28,7 +28,8 @@ export class TabBar {
 
   applyHash() {
     const hash = (window.location.hash || '').replace(/^#/, '').trim();
-    const next = hash && this.tabPanelsByName.has(hash) ? hash : 'overview';
+    const isVisibleTab = this.tabButtons.some((btn) => btn.dataset.tab === hash);
+    const next = hash && this.tabPanelsByName.has(hash) && isVisibleTab ? hash : 'overview';
     this.switchTab(next, { updateHash: false, focusPanel: false });
   }
 

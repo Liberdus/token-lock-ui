@@ -1,3 +1,4 @@
+import { CONFIG } from '../config.js';
 import { extractErrorMessage, normalizeErrorMessage, formatTxMessage } from '../utils/transaction-helpers.js';
 
 const RATE_SCALE = 1_000_000_000_000;
@@ -8,6 +9,8 @@ export class LockActionToasts {
   constructor() {
     this._lock = null;
     this._tokenMeta = { symbol: '', decimals: 18 };
+    this._lockFormTokenMeta = { symbol: '', decimals: null, _token: '' };
+    this._lockFormTokenMetaTimer = null;
   }
 
   load() {
@@ -144,6 +147,47 @@ export class LockActionToasts {
     this.retractSubmitBtn?.addEventListener('click', () => this._submitRetract());
   }
 
+  openLockToast() {
+    const message = this._renderLockFormHtml();
+    const id = window.toastManager?.show?.({
+      id: 'lock-form-toast',
+      title: 'Lock Tokens',
+      message,
+      type: 'info',
+      dismissible: true,
+      timeoutMs: 0,
+      allowHtml: true,
+      className: 'notification--form',
+    });
+
+    const toastEl = document.querySelector(`[data-toast-id="${id}"]`);
+    const root = toastEl?.querySelector?.('.notification-message');
+    if (!root) return;
+
+    this._lockFormToastId = id;
+    this.lockTokenInput = root.querySelector('[data-lock-token]');
+    this.lockDecimalsInput = root.querySelector('[data-lock-decimals]');
+    this.lockSymbolInput = root.querySelector('[data-lock-symbol]');
+    this.lockAmountInput = root.querySelector('[data-lock-amount]');
+    this.lockCliffInput = root.querySelector('[data-lock-cliff]');
+    this.lockDurationInput = root.querySelector('[data-lock-duration]');
+    this.lockRatePctInput = root.querySelector('[data-lock-rate-pct]');
+    this.lockWithdrawInput = root.querySelector('[data-lock-withdraw]');
+    this.lockSubmitBtn = root.querySelector('[data-lock-submit]');
+
+    if (this._lockFormTokenMetaTimer) {
+      clearTimeout(this._lockFormTokenMetaTimer);
+      this._lockFormTokenMetaTimer = null;
+    }
+    this._clearLockTokenMeta();
+    this._updateLockRate();
+
+    this.lockDurationInput?.addEventListener('input', () => this._updateLockRate());
+    this.lockTokenInput?.addEventListener('input', () => this._scheduleLockTokenMetaLoad());
+    this.lockTokenInput?.addEventListener('blur', () => this._loadLockTokenMeta());
+    this.lockSubmitBtn?.addEventListener('click', () => this._submitLock());
+  }
+
   _renderUnlockFormHtml() {
     return `
       <div class="form-grid">
@@ -208,6 +252,51 @@ export class LockActionToasts {
       <div class="actions">
         <button type="button" class="btn btn--primary" data-retract-submit>Retract</button>
       </div>
+    `;
+  }
+
+  _renderLockFormHtml() {
+    return `
+      <div class="form-grid">
+        <label class="field field--full">
+          <span class="field-label">Token Address</span>
+          <input class="field-input" data-lock-token placeholder="Enter token address (0x...)" />
+        </label>
+        <label class="field">
+          <span class="field-label">Token Symbol</span>
+          <input class="field-input" data-lock-symbol value="" readonly />
+        </label>
+        <label class="field">
+          <span class="field-label">Token Decimals</span>
+          <input class="field-input" data-lock-decimals value="" readonly />
+        </label>
+        <label class="field">
+          <span class="field-label">Amount (tokens)</span>
+          <input class="field-input" data-lock-amount type="number" min="0" step="any" placeholder="Enter amount" />
+        </label>
+        <label class="field">
+          <span class="field-label">Cliff (days)</span>
+          <input class="field-input" data-lock-cliff type="number" min="0" step="1" placeholder="Enter cliff days" />
+        </label>
+        <label class="field">
+          <span class="field-label">Vesting Duration (days)</span>
+          <input class="field-input" data-lock-duration type="number" min="1" step="1" placeholder="Enter vesting duration (e.g. 365 days)" />
+        </label>
+        <label class="field">
+          <span class="field-label">Daily %</span>
+          <input class="field-input" data-lock-rate-pct value="" readonly />
+        </label>
+        <label class="field field--full">
+          <span class="field-label">Withdraw Address (optional)</span>
+          <input class="field-input" data-lock-withdraw placeholder="Defaults to your wallet" />
+        </label>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn btn--primary" data-lock-submit>Lock</button>
+      </div>
+      <p class="muted lock-contract-address" style="margin-top:8px;">
+        Contract: <code>${CONFIG.CONTRACT.ADDRESS}</code>
+      </p>
     `;
   }
 
@@ -415,6 +504,178 @@ export class LockActionToasts {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Retract failed'));
       window.toastManager?.error(msg, { title: 'Retract failed' });
     }
+  }
+
+  _updateLockRate() {
+    const duration = Number(this.lockDurationInput?.value || 0);
+    if (!Number.isFinite(duration) || duration <= 0) {
+      if (this.lockRatePctInput) this.lockRatePctInput.value = '';
+      return;
+    }
+    const rate = Math.floor(RATE_SCALE / duration);
+    const pct = (rate / RATE_SCALE) * 100;
+    this.lockRatePctInput.value = `${pct.toFixed(6)}%`;
+  }
+
+  _scheduleLockTokenMetaLoad() {
+    if (this._lockFormTokenMetaTimer) {
+      clearTimeout(this._lockFormTokenMetaTimer);
+    }
+    const token = (this.lockTokenInput?.value || '').trim();
+    const normalized = this._normalizeAddress(token);
+    if (!normalized) {
+      this._clearLockTokenMeta();
+      return;
+    }
+    this._lockFormTokenMetaTimer = setTimeout(() => {
+      this._lockFormTokenMetaTimer = null;
+      this._loadLockTokenMeta();
+    }, 350);
+  }
+
+  async _loadLockTokenMeta() {
+    const token = (this.lockTokenInput?.value || '').trim();
+    if (!token) return;
+    const normalized = this._normalizeAddress(token);
+    if (!normalized) {
+      this._clearLockTokenMeta();
+      return;
+    }
+    if (this._lockFormTokenMeta._token === normalized) return;
+    try {
+      const meta = await window.contractManager.getTokenMetadata(normalized);
+      this._lockFormTokenMeta = { ...(meta || { symbol: '', decimals: null }), _token: normalized };
+      this.lockDecimalsInput.value = meta?.decimals == null ? '' : String(meta.decimals);
+      this.lockSymbolInput.value = meta?.symbol || '';
+    } catch (err) {
+      this._clearLockTokenMeta();
+      const msg = normalizeErrorMessage(extractErrorMessage(err, 'Failed to load token metadata'));
+      window.toastManager?.error(msg, { title: 'Token lookup failed' });
+    }
+  }
+
+  async _submitLock() {
+    try {
+      const tokenInput = (this.lockTokenInput?.value || '').trim();
+      const token = this._normalizeAddress(tokenInput);
+      const amount = Number(this.lockAmountInput?.value || 0);
+      const cliffDays = Number(this.lockCliffInput?.value || 0);
+      const durationDays = Number(this.lockDurationInput?.value || 0);
+      const ratePerDay = Number.isFinite(durationDays) && durationDays > 0
+        ? Math.floor(RATE_SCALE / durationDays)
+        : 0;
+      const withdrawAddress = (this.lockWithdrawInput?.value || '').trim();
+
+      if (!token) throw new Error('Token address required');
+      if (!amount || amount <= 0) throw new Error('Amount must be > 0');
+      if (!Number.isFinite(cliffDays) || cliffDays < 0) throw new Error('Invalid cliff');
+      if (!ratePerDay || ratePerDay <= 0) throw new Error('Invalid rate');
+
+      const meta = await this._ensureLockFormTokenMeta(token);
+      if (meta.decimals == null) throw new Error('Load token info first');
+
+      const parsedAmount = window.ethers.utils.parseUnits(amount.toString(), meta.decimals);
+      const owner = window.walletManager?.getAddress?.();
+      if (!owner) throw new Error('Wallet not connected');
+
+      let flowToastId = null;
+      let lockToastId = null;
+
+      try {
+        flowToastId = window.toastManager?.loading('Checking approval...', { delayMs: 0 });
+        const allowance = await window.contractManager.getTokenAllowance(
+          token,
+          owner,
+          CONFIG.CONTRACT.ADDRESS
+        );
+        const needsApproval = !allowance || allowance.lt(parsedAmount);
+
+        if (needsApproval) {
+          window.toastManager?.update(flowToastId, {
+            type: 'loading',
+            title: 'Approval',
+            message: 'Submitting approval...',
+          });
+          const approveTx = await window.contractManager.approveToken({
+            token,
+            spender: CONFIG.CONTRACT.ADDRESS,
+            amount: parsedAmount,
+          });
+          const approveReceipt = await approveTx.wait();
+          window.toastManager?.update(flowToastId, {
+            type: 'success',
+            title: 'Approved',
+            message: formatTxMessage(approveReceipt.transactionHash, 'Approval confirmed.'),
+            allowHtml: true,
+            timeoutMs: 5000,
+          });
+          await this._sleep(1200);
+        } else {
+          window.toastManager?.dismiss?.(flowToastId);
+          flowToastId = null;
+        }
+
+        lockToastId = window.toastManager?.loading('Submitting lock...', { delayMs: 0 });
+        const tx = await window.contractManager.lock({
+          token,
+          amount: parsedAmount,
+          cliffDays: Math.floor(cliffDays),
+          ratePerDay,
+          withdrawAddress: withdrawAddress || ZERO_ADDRESS,
+        });
+        const receipt = await tx.wait();
+        window.toastManager?.update(lockToastId, {
+          type: 'success',
+          title: 'Lock created',
+          message: formatTxMessage(receipt.transactionHash, 'Lock confirmed.'),
+          allowHtml: true,
+          timeoutMs: 5000,
+        });
+        if (this._lockFormToastId) {
+          window.toastManager?.dismiss?.(this._lockFormToastId);
+          this._lockFormToastId = null;
+        }
+        window.overviewTab?.refreshLocks?.();
+      } catch (innerErr) {
+        if (flowToastId) window.toastManager?.dismiss?.(flowToastId);
+        if (lockToastId) window.toastManager?.dismiss?.(lockToastId);
+        throw innerErr;
+      }
+    } catch (err) {
+      const msg = normalizeErrorMessage(extractErrorMessage(err, 'Lock failed'));
+      window.toastManager?.error(msg, { title: 'Lock failed', timeoutMs: 0 });
+    }
+  }
+
+  async _ensureLockFormTokenMeta(token) {
+    if (!this._lockFormTokenMeta || this._lockFormTokenMeta._token !== token) {
+      const meta = await window.contractManager.getTokenMetadata(token);
+      this._lockFormTokenMeta = { ...(meta || { symbol: '', decimals: null }), _token: token };
+      this.lockDecimalsInput.value = this._lockFormTokenMeta.decimals == null
+        ? ''
+        : String(this._lockFormTokenMeta.decimals);
+      this.lockSymbolInput.value = this._lockFormTokenMeta.symbol || '';
+    }
+    return this._lockFormTokenMeta;
+  }
+
+  _clearLockTokenMeta() {
+    this._lockFormTokenMeta = { symbol: '', decimals: null, _token: '' };
+    if (this.lockDecimalsInput) this.lockDecimalsInput.value = '';
+    if (this.lockSymbolInput) this.lockSymbolInput.value = '';
+  }
+
+  _normalizeAddress(value) {
+    if (!value) return '';
+    try {
+      return window.ethers.utils.getAddress(value);
+    } catch {
+      return '';
+    }
+  }
+
+  _sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   async _ensureTokenMeta(token) {

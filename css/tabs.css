@@ -29,6 +29,10 @@
   white-space: nowrap;
 }
 
+.tab-label-short {
+  display: none;
+}
+
 .tab-button:hover:not(:disabled) {
   background: var(--button-hover-background);
   border-color: var(--border-color);
@@ -57,5 +61,25 @@
 @media (max-width: 768px) {
   .tab-panels {
     min-height: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .tab-bar {
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .tab-button {
+    padding: 8px 10px;
+    font-size: var(--font-size-sm);
+  }
+
+  .tab-button[data-tab="overview"] .tab-label-full {
+    display: none;
+  }
+
+  .tab-button[data-tab="overview"] .tab-label-short {
+    display: inline;
   }
 }

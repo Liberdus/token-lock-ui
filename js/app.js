@@ -62,6 +62,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   parametersTab.load();
   historyTab.load();
 
+  const openLockActionBtn = document.getElementById('open-lock-action-btn');
+  openLockActionBtn?.addEventListener('click', () => {
+    window.lockActionToasts?.openLockToast?.();
+  });
+
   // Load TabBar last so the initial `tabActivated` event
   // is received by all tab components (lazy tab loading).
   tabBar.load();
