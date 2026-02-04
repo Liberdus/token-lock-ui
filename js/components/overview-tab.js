@@ -175,20 +175,19 @@ export class OverviewTab {
   }
 
   async _loadLocks(lockIds) {
-    const contract = window.contractManager.getReadContract();
-    if (!contract) return;
-
+    const manager = window.contractManager;
     const locks = [];
-    for (const id of lockIds) {
-      try {
-        const lock = await contract.getLock(id);
-        if (!lock || !lock.creator) continue;
-        locks.push({ id, lock });
-        this._tokens.add(lock.token.toLowerCase());
-      } catch {
-        // ignore
-      }
-    }
+    const lockData = typeof manager?.getLocksBatch === 'function'
+      ? await manager.getLocksBatch(lockIds)
+      : await Promise.all(lockIds.map(async (id) => manager.getLock(id).catch(() => null)));
+    this._tokens = new Set();
+
+    lockIds.forEach((id, idx) => {
+      const lock = lockData?.[idx];
+      if (!lock || !lock.creator || !lock.token) return;
+      locks.push({ id, lock });
+      this._tokens.add(lock.token.toLowerCase());
+    });
 
     this._locks = locks;
     this._lockIndex = new Map(locks.map((l) => [l.id, l.lock]));
@@ -199,8 +198,22 @@ export class OverviewTab {
   }
 
   async _primeTokenMeta() {
-    for (const addr of this._tokens) {
-      if (this._tokenMeta.has(addr)) continue;
+    const missing = Array.from(this._tokens.values()).filter((addr) => !this._tokenMeta.has(addr));
+    if (!missing.length) return;
+
+    if (typeof window.contractManager?.getTokenMetadataBatch === 'function') {
+      try {
+        const metaMap = await window.contractManager.getTokenMetadataBatch(missing);
+        missing.forEach((addr) => {
+          this._tokenMeta.set(addr, metaMap.get(addr) || { symbol: '', decimals: 18 });
+        });
+        return;
+      } catch {
+        // Fallback to single calls below.
+      }
+    }
+
+    for (const addr of missing) {
       try {
         const meta = await window.contractManager.getTokenMetadata(addr);
         this._tokenMeta.set(addr, meta || { symbol: '', decimals: 18 });
@@ -211,6 +224,21 @@ export class OverviewTab {
   }
 
   async _primeAvailable() {
+    const lockIds = this._locks.map((entry) => entry.id);
+    if (!lockIds.length) return;
+
+    if (typeof window.contractManager?.previewWithdrawableBatch === 'function') {
+      try {
+        const values = await window.contractManager.previewWithdrawableBatch(lockIds);
+        this._locks.forEach((entry, idx) => {
+          entry.available = values?.[idx] ?? null;
+        });
+        return;
+      } catch {
+        // Fallback to single calls below.
+      }
+    }
+
     for (const entry of this._locks) {
       try {
         const v = await window.contractManager.previewWithdrawable(entry.id);

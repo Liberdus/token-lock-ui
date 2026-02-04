@@ -1,5 +1,6 @@
 import { CONFIG } from '../config.js';
 import { getReadOnlyProvider } from '../utils/read-only-provider.js';
+import { MulticallService } from '../utils/multicall-service.js';
 
 const ERC20_ABI = [
   'function decimals() view returns (uint8)',
@@ -21,6 +22,8 @@ export class ContractManager {
     this.abi = null;
     this.contractRead = null;
     this.contractWrite = null;
+    this.multicall = new MulticallService();
+    this._multicallInitPromise = null;
 
     this._loadPromise = null;
   }
@@ -43,6 +46,7 @@ export class ContractManager {
     this.abi = await this._fetchAbi();
 
     this.updateConnections();
+    await this._initMulticall();
 
     document.addEventListener('walletConnected', () => this.updateConnections());
     document.addEventListener('walletDisconnected', () => this.updateConnections());
@@ -76,6 +80,7 @@ export class ContractManager {
 
     this.contractRead = this._makeContract(this.provider);
     this.contractWrite = this.signer ? this._makeContract(this.signer) : null;
+    this._initMulticall().catch(() => {});
 
     this._emitUpdatedEvent({ txEnabled, reason: 'connectionsChanged' });
   }
@@ -155,11 +160,45 @@ export class ContractManager {
     return contract.getLock(lockId);
   }
 
+  async getLocksBatch(lockIds = []) {
+    const ids = Array.isArray(lockIds) ? lockIds : [];
+    if (!ids.length) return [];
+    const contract = this.getReadContract();
+    if (!contract) return ids.map(() => null);
+
+    if (await this._isMulticallReady()) {
+      const calls = ids.map((id) => this.multicall.createCall(contract, 'getLock', [id]));
+      const batch = await this.multicall.batchCall(calls, { requireSuccess: false, maxRetries: 1 });
+      if (Array.isArray(batch) && batch.length === ids.length) {
+        return batch.map((result) => this._decodeMulticallResult(result, contract, 'getLock'));
+      }
+    }
+
+    return await Promise.all(ids.map(async (id) => this.getLock(id).catch(() => null)));
+  }
+
   async previewWithdrawable(lockId) {
     const contract = this.getReadContract();
     if (!contract) return null;
     const v = await contract.previewWithdrawable(lockId);
     return v;
+  }
+
+  async previewWithdrawableBatch(lockIds = []) {
+    const ids = Array.isArray(lockIds) ? lockIds : [];
+    if (!ids.length) return [];
+    const contract = this.getReadContract();
+    if (!contract) return ids.map(() => null);
+
+    if (await this._isMulticallReady()) {
+      const calls = ids.map((id) => this.multicall.createCall(contract, 'previewWithdrawable', [id]));
+      const batch = await this.multicall.batchCall(calls, { requireSuccess: false, maxRetries: 1 });
+      if (Array.isArray(batch) && batch.length === ids.length) {
+        return batch.map((result) => this._decodeMulticallResult(result, contract, 'previewWithdrawable'));
+      }
+    }
+
+    return await Promise.all(ids.map(async (id) => this.previewWithdrawable(id).catch(() => null)));
   }
 
   async lock({ token, amount, cliffDays, ratePerDay, withdrawAddress }) {
@@ -196,6 +235,41 @@ export class ContractManager {
     return { symbol, decimals: Number(decimals) };
   }
 
+  async getTokenMetadataBatch(tokenAddresses = []) {
+    const unique = Array.from(new Set((tokenAddresses || []).map((addr) => String(addr || '').toLowerCase()).filter(Boolean)));
+    if (!unique.length) return new Map();
+
+    if (!(await this._isMulticallReady())) {
+      const pairs = await Promise.all(unique.map(async (addr) => [addr, await this.getTokenMetadata(addr)]));
+      return new Map(pairs.map(([addr, meta]) => [addr, meta || { symbol: '', decimals: 18 }]));
+    }
+
+    const iface = new window.ethers.utils.Interface(ERC20_ABI);
+    const calls = [];
+    unique.forEach((addr) => {
+      calls.push({ target: addr, callData: iface.encodeFunctionData('symbol', []) });
+      calls.push({ target: addr, callData: iface.encodeFunctionData('decimals', []) });
+    });
+
+    const batch = await this.multicall.batchCall(calls, { requireSuccess: false, maxRetries: 1 });
+    if (!Array.isArray(batch) || batch.length !== calls.length) {
+      const pairs = await Promise.all(unique.map(async (addr) => [addr, await this.getTokenMetadata(addr)]));
+      return new Map(pairs.map(([addr, meta]) => [addr, meta || { symbol: '', decimals: 18 }]));
+    }
+
+    const out = new Map();
+    unique.forEach((addr, i) => {
+      const symbolRaw = this._decodeMulticallResult(batch[i * 2], iface, 'symbol');
+      const decimalsRaw = this._decodeMulticallResult(batch[i * 2 + 1], iface, 'decimals');
+      const decimalsValue = Number(decimalsRaw?.toString?.() ?? decimalsRaw);
+      out.set(addr, {
+        symbol: typeof symbolRaw === 'string' ? symbolRaw : '',
+        decimals: Number.isFinite(decimalsValue) ? decimalsValue : 18,
+      });
+    });
+    return out;
+  }
+
   async getTokenBalance(tokenAddress, owner) {
     const contract = this._makeErc20Contract(tokenAddress, this.readOnlyProvider);
     if (!contract) return null;
@@ -206,6 +280,33 @@ export class ContractManager {
     const contract = this._makeErc20Contract(tokenAddress, this.readOnlyProvider);
     if (!contract) return null;
     return contract.allowance(owner, spender);
+  }
+
+  async _initMulticall() {
+    if (this._multicallInitPromise) return this._multicallInitPromise;
+    const provider = this.readOnlyProvider || this.provider;
+    if (!provider || !window.ethers) return false;
+
+    this._multicallInitPromise = this.multicall
+      .initialize(provider, Number(CONFIG?.NETWORK?.CHAIN_ID))
+      .catch(() => false)
+      .finally(() => {
+        this._multicallInitPromise = null;
+      });
+    return await this._multicallInitPromise;
+  }
+
+  async _isMulticallReady() {
+    if (this.multicall?.isReady?.()) return true;
+    return !!(await this._initMulticall());
+  }
+
+  _decodeMulticallResult(result, contractOrInterface, methodName) {
+    if (!result) return null;
+    const success = Array.isArray(result) ? !!result[0] : !!result.success;
+    const returnData = Array.isArray(result) ? result[1] : result.returnData;
+    if (!success || !returnData || returnData === '0x') return null;
+    return this.multicall.decodeResult(contractOrInterface, methodName, returnData);
   }
 
   async approveToken({ token, spender, amount }) {
