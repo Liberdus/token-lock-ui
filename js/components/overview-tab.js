@@ -309,10 +309,31 @@ export class OverviewTab {
     const cliffEnd = unlockTime > 0 ? unlockTime + cliffDays * SECONDS_PER_DAY : null;
     const vestingDays = ratePerDay > 0 ? Math.ceil(RATE_SCALE / ratePerDay) : 0;
     const vestingEnd = cliffEnd ? cliffEnd + vestingDays * SECONDS_PER_DAY : null;
+    const now = Math.floor(Date.now() / 1000);
+    let vestingProgressPct = 0;
+    if (vestingEnd && cliffEnd) {
+      if (now <= cliffEnd) {
+        vestingProgressPct = 0;
+      } else if (now >= vestingEnd) {
+        vestingProgressPct = 100;
+      } else if (vestingEnd > cliffEnd) {
+        vestingProgressPct = ((now - cliffEnd) / (vestingEnd - cliffEnd)) * 100;
+      }
+    }
 
-    const cliffMonths = cliffDays ? (cliffDays / 30).toFixed(1) : '0';
     const dailyPct = ratePerDay ? ((ratePerDay / RATE_SCALE) * 100).toFixed(4) : '0.0000';
-    const vestingMonths = vestingDays ? (vestingDays / 30).toFixed(1) : '0';
+    const formatMonthsDays = (days) => {
+      const safeDays = Number.isFinite(days) && days > 0 ? Math.floor(days) : 0;
+      if (!safeDays) return '0 days';
+      const months = Math.floor(safeDays / 30);
+      const remDays = safeDays % 30;
+      const parts = [];
+      if (months) parts.push(`${months} month${months === 1 ? '' : 's'}`);
+      if (remDays) parts.push(`${remDays} day${remDays === 1 ? '' : 's'}`);
+      return parts.join(' ');
+    };
+    const cliffDurationLabel = formatMonthsDays(cliffDays);
+    const vestingDurationLabel = formatMonthsDays(vestingDays);
 
     const withdrawShort = `${lock.withdrawAddress.slice(0, 6)}…${lock.withdrawAddress.slice(-4)}`;
     const me = (window.walletManager?.getAddress?.() || '').toLowerCase();
@@ -362,13 +383,13 @@ export class OverviewTab {
           </div>
         </div>
 
-        <div class="lock-progress">
+        <div class="lock-progress lock-progress--vesting">
           <div class="lock-progress-header">
-            <span class="field-label">Withdrawn</span>
-            <span class="lock-progress-value">${withdrawn} / ${amount} ${meta.symbol || ''}</span>
+            <span class="field-label">Vesting progress</span>
+            <span class="lock-progress-value">${vestingProgressPct.toFixed(2)}%</span>
           </div>
           <div class="lock-progress-bar" role="presentation">
-            <span class="lock-progress-fill" style="width:${progressPct.toFixed(2)}%"></span>
+            <span class="lock-progress-fill" style="width:${vestingProgressPct.toFixed(2)}%"></span>
           </div>
         </div>
 
@@ -383,6 +404,15 @@ export class OverviewTab {
               <div class="field-label">Available now</div>
               <div class="field-input">${available}</div>
             </div>
+            <div class="lock-progress lock-progress--compact">
+              <div class="lock-progress-header">
+                <span class="field-label">Withdrawn</span>
+                <span class="lock-progress-value">${withdrawn} / ${amount} ${meta.symbol || ''}</span>
+              </div>
+              <div class="lock-progress-bar" role="presentation">
+                <span class="lock-progress-fill" style="width:${progressPct.toFixed(2)}%"></span>
+              </div>
+            </div>
           </div>
 
           <div class="lock-group">
@@ -393,7 +423,7 @@ export class OverviewTab {
             </div>
             <div class="lock-kv">
               <div class="field-label">Cliff</div>
-              <div class="field-input">${cliffMonths} months</div>
+              <div class="field-input">${cliffDurationLabel}</div>
             </div>
             <div class="lock-kv">
               <div class="field-label">Vesting rate</div>
@@ -401,7 +431,7 @@ export class OverviewTab {
             </div>
             <div class="lock-kv">
               <div class="field-label">Vesting duration</div>
-              <div class="field-input">${vestingMonths} months${vestingEnd ? ` (ends ${new Date(vestingEnd * 1000).toLocaleDateString()})` : ''}</div>
+              <div class="field-input">${vestingDurationLabel}${vestingEnd ? ` (ends ${new Date(vestingEnd * 1000).toLocaleDateString()})` : ''}</div>
             </div>
           </div>
 

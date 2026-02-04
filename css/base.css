@@ -239,6 +239,15 @@ textarea:focus-visible {
   margin-bottom: 12px;
 }
 
+.lock-progress--compact {
+  margin-bottom: 0;
+  margin-top: 8px;
+}
+
+.lock-progress--compact .lock-progress-bar {
+  height: 6px;
+}
+
 .lock-progress-header {
   display: flex;
   align-items: center;
