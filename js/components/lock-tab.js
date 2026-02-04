@@ -24,7 +24,7 @@ export class LockTab {
         <div class="form-grid">
           <label class="field field--full">
             <span class="field-label">Token Address</span>
-            <input class="field-input" data-lock-token placeholder="0x..." />
+            <input class="field-input" data-lock-token placeholder="Enter token address (0x...)" />
           </label>
           <label class="field">
             <span class="field-label">Token Symbol</span>
@@ -36,15 +36,15 @@ export class LockTab {
           </label>
           <label class="field">
             <span class="field-label">Amount (tokens)</span>
-            <input class="field-input" data-lock-amount type="number" min="0" step="any" placeholder="1000" />
+            <input class="field-input" data-lock-amount type="number" min="0" step="any" placeholder="Enter amount" />
           </label>
           <label class="field">
             <span class="field-label">Cliff (days)</span>
-            <input class="field-input" data-lock-cliff type="number" min="0" step="1" value="0" />
+            <input class="field-input" data-lock-cliff type="number" min="0" step="1" placeholder="Enter cliff days" />
           </label>
           <label class="field">
             <span class="field-label">Vesting Duration (days)</span>
-            <input class="field-input" data-lock-duration type="number" min="1" step="1" value="365" />
+            <input class="field-input" data-lock-duration type="number" min="1" step="1" placeholder="Enter vesting duration (e.g. 365 days)" />
           </label>
           <label class="field">
             <span class="field-label">Daily %</span>
@@ -90,8 +90,7 @@ export class LockTab {
   _updateRate() {
     const duration = Number(this.durationInput?.value || 0);
     if (!Number.isFinite(duration) || duration <= 0) {
-      this.rateInput.value = '';
-      this.ratePctInput.value = '';
+      if (this.ratePctInput) this.ratePctInput.value = '';
       return;
     }
     const rate = Math.floor(RATE_SCALE / duration);
