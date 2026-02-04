@@ -34,14 +34,15 @@ export class HistoryTab {
       </div>
 
       <div class="card">
-        <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
-          <label style="display:flex; gap:8px; align-items:center; font-size: var(--font-size-sm);">
-            <input type="checkbox" data-history-mine checked />
+        <div class="history-controls">
+          <label class="history-mine-toggle">
+            <input type="checkbox" data-history-mine />
             My completed locks
           </label>
-          <details data-history-advanced>
-            <summary style="cursor:pointer; font-size: var(--font-size-sm); color: var(--secondary-text-color);">Advanced filters</summary>
-            <div class="form-grid" style="margin-top:12px;">
+          <details class="history-advanced" data-history-advanced>
+            <summary class="history-advanced-summary">Advanced filters</summary>
+            <div class="history-advanced-panel">
+              <div class="form-grid history-advanced-grid">
               <label class="field">
                 <span class="field-label">From block</span>
                 <input class="field-input" data-history-from type="number" min="0" step="1" placeholder="0" />
@@ -58,6 +59,7 @@ export class HistoryTab {
                 <span class="field-label">Withdraw address filter</span>
                 <input class="field-input" data-history-withdraw placeholder="0x..." />
               </label>
+              </div>
             </div>
           </details>
         </div>
@@ -85,14 +87,35 @@ export class HistoryTab {
     this.listEl = this.panel.querySelector('[data-history-list]');
 
     this.loadBtn?.addEventListener('click', () => this._loadHistory());
+    this.panel?.addEventListener('click', (e) => this._handlePanelClick(e));
+    this.mineInput?.addEventListener('change', () => this._savePreferences());
+
+    document.addEventListener('walletConnected', () => this._syncMineFilterFromWallet());
+    document.addEventListener('walletAccountChanged', () => this._syncMineFilterFromWallet());
+    document.addEventListener('walletDisconnected', () => this._syncMineFilterFromWallet());
 
     if (this.fromInput && CONFIG?.CONTRACT?.DEPLOYMENT_BLOCK) {
       this.fromInput.value = String(CONFIG.CONTRACT.DEPLOYMENT_BLOCK);
     }
+
+    this._syncMineFilterFromWallet();
   }
 
   _setStatus(message) {
     if (this.statusEl) this.statusEl.textContent = message || '';
+  }
+
+  async _handlePanelClick(e) {
+    const copyBtn = e.target?.closest?.('[data-copy]');
+    if (!copyBtn) return;
+    const value = copyBtn.dataset.copy || '';
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      window.toastManager?.success?.('Copied to clipboard', { title: 'Copied', timeoutMs: 1800 });
+    } catch {
+      window.toastManager?.error?.('Failed to copy', { title: 'Copy failed' });
+    }
   }
 
   async _loadHistory() {
@@ -175,6 +198,9 @@ export class HistoryTab {
     const rows = [];
     for (const e of events) {
       const tokenAddr = String(e.token);
+      const creator = String(e.creator || '');
+      const withdrawAddress = String(e.withdrawAddress || '');
+      const txHash = String(e.txHash || '');
       const meta = await this._getTokenMeta(tokenAddr);
       const fmt = (v) => window.ethers.utils.formatUnits(v || 0, meta.decimals || 18);
       const closedAt = await this._getBlockTime(provider, e.blockNumber);
@@ -182,21 +208,80 @@ export class HistoryTab {
       const unlockTime = Number(e.unlockTime || 0);
 
       rows.push(`
-        <div class="card" style="margin-bottom:12px;">
-          <div class="panel-header" style="margin-bottom:6px;">
-            <h2 style="font-size: var(--font-size-lg);">Lock #${e.lockId}</h2>
-            <p class="muted">${reason} • ${closedAt ? new Date(closedAt * 1000).toLocaleString() : 'Unknown time'}</p>
+        <div class="card lock-card">
+          <div class="lock-header">
+            <div>
+              <h2 class="lock-title">Lock #${e.lockId}</h2>
+              <p class="muted">${reason} • ${closedAt ? new Date(closedAt * 1000).toLocaleString() : 'Unknown time'}</p>
+            </div>
           </div>
-          <div class="form-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
-            <div class="field"><span class="field-label">Token</span><div class="field-input">${meta.symbol || 'ERC20'} (${tokenAddr.slice(0,6)}…${tokenAddr.slice(-4)})</div></div>
-            <div class="field"><span class="field-label">Amount</span><div class="field-input">${fmt(e.amount)} ${meta.symbol}</div></div>
-            <div class="field"><span class="field-label">Withdrawn</span><div class="field-input">${fmt(e.withdrawn)} ${meta.symbol}</div></div>
-            <div class="field"><span class="field-label">Cliff Days</span><div class="field-input">${e.cliffDays}</div></div>
-            <div class="field"><span class="field-label">Rate Per Day</span><div class="field-input">${e.ratePerDay}</div></div>
-            <div class="field"><span class="field-label">Unlock Time</span><div class="field-input">${unlockTime ? new Date(unlockTime * 1000).toLocaleString() : 'Not unlocked'}</div></div>
-            <div class="field"><span class="field-label">Creator</span><div class="field-input">${String(e.creator).slice(0,6)}…${String(e.creator).slice(-4)}</div></div>
-            <div class="field"><span class="field-label">Withdraw Address</span><div class="field-input">${String(e.withdrawAddress).slice(0,6)}…${String(e.withdrawAddress).slice(-4)}</div></div>
-            <div class="field"><span class="field-label">Tx</span><div class="field-input">${String(e.txHash).slice(0,10)}…</div></div>
+          <div class="lock-grid">
+            <div class="lock-group">
+              <div class="lock-group-title">Token and Balances</div>
+              <div class="lock-kv">
+                <div class="field-label">Token</div>
+                <div class="field-input lock-address" title="${tokenAddr}">
+                  <span>${meta.symbol || 'ERC20'} (${this._shortAddress(tokenAddr)})</span>
+                  <button type="button" class="btn btn--ghost btn--icon" data-copy="${tokenAddr}" aria-label="Copy token address">
+                    <svg class="icon icon-copy" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M8 8a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8zm-3 9V7a4 4 0 0 1 4-4h7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="lock-kv">
+                <div class="field-label">Amount</div>
+                <div class="field-input">${fmt(e.amount)} ${meta.symbol}</div>
+              </div>
+              <div class="lock-kv">
+                <div class="field-label">Withdrawn</div>
+                <div class="field-input">${fmt(e.withdrawn)} ${meta.symbol}</div>
+              </div>
+            </div>
+            <div class="lock-group">
+              <div class="lock-group-title">Schedule</div>
+              <div class="lock-kv">
+                <div class="field-label">Cliff Days</div>
+                <div class="field-input">${e.cliffDays}</div>
+              </div>
+              <div class="lock-kv">
+                <div class="field-label">Rate Per Day</div>
+                <div class="field-input">${e.ratePerDay}</div>
+              </div>
+              <div class="lock-kv">
+                <div class="field-label">Unlock Time</div>
+                <div class="field-input">${unlockTime ? new Date(unlockTime * 1000).toLocaleString() : 'Not unlocked'}</div>
+              </div>
+            </div>
+            <div class="lock-group">
+              <div class="lock-group-title">Parties and Tx</div>
+              <div class="lock-kv">
+                <div class="field-label">Creator</div>
+                <div class="field-input lock-address" title="${creator}">
+                  <span>${this._shortAddress(creator)}</span>
+                  <button type="button" class="btn btn--ghost btn--icon" data-copy="${creator}" aria-label="Copy creator address">
+                    <svg class="icon icon-copy" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M8 8a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8zm-3 9V7a4 4 0 0 1 4-4h7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="lock-kv">
+                <div class="field-label">Withdraw Address</div>
+                <div class="field-input lock-address" title="${withdrawAddress}">
+                  <span>${this._shortAddress(withdrawAddress)}</span>
+                  <button type="button" class="btn btn--ghost btn--icon" data-copy="${withdrawAddress}" aria-label="Copy withdraw address">
+                    <svg class="icon icon-copy" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M8 8a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8zm-3 9V7a4 4 0 0 1 4-4h7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div class="lock-kv">
+                <div class="field-label">Tx</div>
+                <div class="field-input">${this._renderTxLink(txHash)}</div>
+              </div>
+            </div>
           </div>
         </div>
       `);
@@ -228,5 +313,67 @@ export class HistoryTab {
       this._blockTimeCache.set(blockNumber, 0);
       return 0;
     }
+  }
+
+  _shortAddress(value) {
+    const s = String(value || '');
+    if (!s) return '—';
+    if (s.length < 10) return s;
+    return `${s.slice(0, 6)}…${s.slice(-4)}`;
+  }
+
+  _renderTxLink(txHash) {
+    const hash = String(txHash || '');
+    if (!hash) return '—';
+    const explorer = CONFIG?.NETWORK?.BLOCK_EXPLORER || 'https://polygonscan.com';
+    const txUrl = `${explorer}/tx/${hash}`;
+    return `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" title="${hash}">${this._shortAddress(hash)}</a>`;
+  }
+
+  _syncMineFilterFromWallet() {
+    if (!this.mineInput) return;
+    const wallet = (window.walletManager?.getAddress?.() || '').toLowerCase();
+    const isConnected = !!wallet;
+    const reason = 'Connect your wallet to use this filter.';
+    this.mineInput.disabled = !isConnected;
+    this.mineInput.title = isConnected ? '' : reason;
+    if (!isConnected) {
+      this.mineInput.checked = false;
+      return;
+    }
+    this._restorePreferences();
+  }
+
+  _restorePreferences() {
+    const key = this._getPreferencesKey();
+    if (!key || !this.mineInput) return false;
+    try {
+      const raw = window.localStorage?.getItem(key);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      if (parsed?.mineOnly == null) return false;
+      this.mineInput.checked = !!parsed.mineOnly;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  _savePreferences() {
+    const key = this._getPreferencesKey();
+    if (!key || !this.mineInput) return;
+    try {
+      window.localStorage?.setItem(key, JSON.stringify({ mineOnly: !!this.mineInput.checked }));
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  _getPreferencesKey() {
+    const chainId = Number(CONFIG?.NETWORK?.CHAIN_ID || 0);
+    const address = String(CONFIG?.CONTRACT?.ADDRESS || '').toLowerCase();
+    const wallet = (window.walletManager?.getAddress?.() || '').toLowerCase();
+    if (!chainId || !address || !wallet) return null;
+    return `liberdus_token_ui:history:prefs:v1:${chainId}:${address}:${wallet}`;
   }
 }

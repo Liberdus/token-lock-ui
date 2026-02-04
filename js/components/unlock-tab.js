@@ -233,7 +233,7 @@ export class LockActionToasts {
       </div>
       <div class="actions">
         <button type="button" class="btn" data-withdraw-max>Use 100%</button>
-        <button type="button" class="btn btn--primary" data-withdraw-submit>Withdraw</button>
+        <button type="button" class="btn btn--success" data-withdraw-submit>Withdraw</button>
       </div>
     `;
   }
@@ -251,7 +251,7 @@ export class LockActionToasts {
         </label>
       </div>
       <div class="actions">
-        <button type="button" class="btn btn--primary" data-retract-submit>Retract</button>
+        <button type="button" class="btn btn--danger" data-retract-submit>Retract</button>
       </div>
     `;
   }
@@ -295,9 +295,6 @@ export class LockActionToasts {
       <div class="actions">
         <button type="button" class="btn btn--primary" data-lock-submit>Lock</button>
       </div>
-      <p class="muted lock-contract-address" style="margin-top:8px;">
-        Contract: <code>${CONFIG.CONTRACT.ADDRESS}</code>
-      </p>
     `;
   }
 

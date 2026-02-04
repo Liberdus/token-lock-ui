@@ -36,7 +36,6 @@
   box-shadow: var(--elev-2);
   display: flex;
   align-items: center;
-  gap: 12px;
   transform: translateY(-20px);
   opacity: 0;
   transition: all 0.3s ease;
@@ -180,6 +179,7 @@
 .notification-content {
   flex: 1;
   min-width: 0;
+  margin-left: 12px;
 }
 
 .notification-title {
