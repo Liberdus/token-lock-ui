@@ -538,6 +538,13 @@ textarea:focus-visible {
 .lock-filter-field {
   display: grid;
   gap: 6px;
+  min-width: 0;
+}
+
+.lock-filter-field .field-input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 @media (max-width: 900px) {
@@ -547,6 +554,55 @@ textarea:focus-visible {
 }
 
 @media (max-width: 640px) {
+  .pagination-row {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .pagination-left {
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .pagination-left .field-label,
+  .pagination-count {
+    white-space: nowrap;
+  }
+
+  .pagination-select {
+    min-width: 72px;
+    height: 36px;
+    line-height: 36px;
+    padding: 4px 8px;
+  }
+
+  .pagination-actions .btn {
+    padding: 8px 10px;
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+  }
+
+  .lock-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .lock-actions {
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .lock-actions .btn {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 8px 10px;
+    font-size: var(--font-size-sm);
+    white-space: nowrap;
+  }
+
   .lock-progress-header {
     flex-direction: column;
     align-items: flex-start;
@@ -754,6 +810,11 @@ textarea:focus-visible {
 .muted {
   margin: 6px 0 0;
   color: var(--secondary-text-color);
+}
+
+.lock-contract-address code {
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .list {

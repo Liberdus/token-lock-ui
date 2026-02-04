@@ -134,6 +134,10 @@ export class OverviewTab {
         this.renderLocks();
       }
     });
+    document.addEventListener('walletDisconnected', () => {
+      this._updateFilterState();
+      this.renderLocks();
+    });
   }
 
   async _ensureTokenMeta(token) {

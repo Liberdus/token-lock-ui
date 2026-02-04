@@ -264,6 +264,7 @@ export class LocksPage {
 
     document.addEventListener('walletConnected', () => this.renderLocks());
     document.addEventListener('walletAccountChanged', () => this.renderLocks());
+    document.addEventListener('walletDisconnected', () => this.renderLocks());
   }
 
   _setStatus(message) {

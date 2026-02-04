@@ -60,7 +60,7 @@ export class LockTab {
           <button type="button" class="btn btn--primary" data-lock-submit>Lock</button>
         </div>
 
-        <p class="muted" style="margin-top:12px;">
+        <p class="muted lock-contract-address" style="margin-top:12px;">
           Contract: <code>${CONFIG.CONTRACT.ADDRESS}</code>
         </p>
       </div>
