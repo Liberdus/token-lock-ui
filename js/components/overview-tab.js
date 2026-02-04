@@ -379,6 +379,66 @@ export class OverviewTab {
       }
     }
 
+    const formatDate = (ts) => {
+      if (!Number.isFinite(ts) || ts <= 0) return 'n/a';
+      return new Date(ts * 1000).toLocaleDateString();
+    };
+
+    const hasUnlock = unlockTime > 0;
+    const hasCliff = Number.isFinite(cliffEnd) && cliffEnd > unlockTime;
+    const hasVestingWindow = Number.isFinite(vestingEnd) && Number.isFinite(cliffEnd) && vestingEnd > cliffEnd;
+    const timelineStart = hasUnlock && now >= unlockTime ? unlockTime : now;
+    const timelineEndRaw = hasVestingWindow
+      ? vestingEnd
+      : hasCliff
+        ? cliffEnd
+        : Math.max(now, hasUnlock ? unlockTime : now);
+    const timelineEnd = Math.max(timelineStart + SECONDS_PER_DAY, timelineEndRaw);
+    const timelineRange = timelineEnd - timelineStart;
+    const timelinePct = (ts) => {
+      if (!Number.isFinite(ts) || timelineRange <= 0) return 0;
+      const pct = ((ts - timelineStart) / timelineRange) * 100;
+      return Math.min(100, Math.max(0, pct));
+    };
+    const markerEdgeClass = (pct) => {
+      if (pct <= 8) return ' lock-vesting-marker--edge-left';
+      if (pct >= 92) return ' lock-vesting-marker--edge-right';
+      return '';
+    };
+    const todayMarkerPct = timelinePct(now);
+    const unlockMarkerPct = hasUnlock ? timelinePct(unlockTime) : 0;
+    const cliffMarkerPct = hasCliff ? timelinePct(cliffEnd) : 0;
+    const vestingEndMarkerPct = hasVestingWindow ? timelinePct(vestingEnd) : 0;
+    const showTodayMarker = now < timelineEndRaw;
+    const timelineLeftLabel = hasUnlock && now >= unlockTime
+      ? `Unlock • ${formatDate(unlockTime)}`
+      : `Today • ${formatDate(now)}`;
+    const timelineRightLabel = hasVestingWindow
+      ? `Vesting end • ${formatDate(vestingEnd)}`
+      : hasCliff
+        ? `Cliff end • ${formatDate(cliffEnd)}`
+        : `Today • ${formatDate(now)}`;
+
+    let vestingPhase = 'Schedule unavailable';
+    if (hasUnlock && now < unlockTime) vestingPhase = 'Waiting for unlock';
+    else if (hasCliff && now < cliffEnd) vestingPhase = 'In cliff period';
+    else if (hasVestingWindow && now < vestingEnd) vestingPhase = 'Vesting in progress';
+    else if (hasVestingWindow && now >= vestingEnd) vestingPhase = 'Vesting complete';
+    else if (hasUnlock) vestingPhase = 'Unlocked';
+
+    const nextMilestone = hasVestingWindow ? vestingEnd : (hasCliff ? cliffEnd : (hasUnlock ? unlockTime : null));
+    const milestoneName = hasVestingWindow ? 'vesting end' : (hasCliff ? 'cliff end' : 'unlock');
+    let milestoneLabel = 'No upcoming milestones';
+    if (nextMilestone) {
+      const deltaSeconds = nextMilestone - now;
+      const dayDelta = deltaSeconds >= 0
+        ? Math.ceil(deltaSeconds / SECONDS_PER_DAY)
+        : -Math.ceil(Math.abs(deltaSeconds) / SECONDS_PER_DAY);
+      if (dayDelta > 0) milestoneLabel = `${dayDelta} day${dayDelta === 1 ? '' : 's'} to ${milestoneName}`;
+      else if (dayDelta === 0) milestoneLabel = `${milestoneName[0].toUpperCase()}${milestoneName.slice(1)} is today`;
+      else milestoneLabel = `${Math.abs(dayDelta)} day${Math.abs(dayDelta) === 1 ? '' : 's'} since ${milestoneName}`;
+    }
+
     const dailyPct = ratePerDay ? ((ratePerDay / RATE_SCALE) * 100).toFixed(4) : '0.0000';
     const formatMonthsDays = (days) => {
       const safeDays = Number.isFinite(days) && days > 0 ? Math.floor(days) : 0;
@@ -461,8 +521,42 @@ export class OverviewTab {
             <span class="field-label">Vesting progress</span>
             <span class="lock-progress-value">${vestingProgressPct.toFixed(2)}%</span>
           </div>
-          <div class="lock-progress-bar" role="presentation">
-            <span class="lock-progress-fill" style="width:${vestingProgressPct.toFixed(2)}%"></span>
+          <div class="lock-vesting-timeline" role="presentation">
+            <div class="lock-vesting-track">
+              <span class="lock-vesting-track-fill" style="width:${todayMarkerPct.toFixed(2)}%"></span>
+              ${hasUnlock ? `
+              <span class="lock-vesting-marker lock-vesting-marker--unlock${markerEdgeClass(unlockMarkerPct)}" style="left:${unlockMarkerPct.toFixed(2)}%">
+                <span class="lock-vesting-marker-dot"></span>
+                <span class="lock-vesting-marker-label">Unlock</span>
+              </span>
+              ` : ''}
+              ${hasCliff ? `
+              <span class="lock-vesting-marker lock-vesting-marker--cliff${markerEdgeClass(cliffMarkerPct)}" style="left:${cliffMarkerPct.toFixed(2)}%">
+                <span class="lock-vesting-marker-dot"></span>
+                <span class="lock-vesting-marker-label">Cliff end</span>
+              </span>
+              ` : ''}
+              ${hasVestingWindow ? `
+              <span class="lock-vesting-marker lock-vesting-marker--end${markerEdgeClass(vestingEndMarkerPct)}" style="left:${vestingEndMarkerPct.toFixed(2)}%">
+                <span class="lock-vesting-marker-dot"></span>
+                <span class="lock-vesting-marker-label">Vesting end</span>
+              </span>
+              ` : ''}
+              ${showTodayMarker ? `
+              <span class="lock-vesting-marker lock-vesting-marker--today${markerEdgeClass(todayMarkerPct)}" style="left:${todayMarkerPct.toFixed(2)}%">
+                <span class="lock-vesting-marker-dot"></span>
+                <span class="lock-vesting-marker-label">Today</span>
+              </span>
+              ` : ''}
+            </div>
+            <div class="lock-vesting-axis">
+              <span>${timelineLeftLabel}</span>
+              <span>${timelineRightLabel}</span>
+            </div>
+            <div class="lock-vesting-meta">
+              <span>${vestingPhase}</span>
+              <span>${milestoneLabel}</span>
+            </div>
           </div>
         </div>
 

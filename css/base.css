@@ -248,6 +248,15 @@ textarea:focus-visible {
   height: 6px;
 }
 
+.lock-progress--vesting {
+  display: grid;
+  gap: 8px;
+}
+
+.lock-progress--vesting .lock-progress-header {
+  margin-bottom: 0;
+}
+
 .lock-progress-header {
   display: flex;
   align-items: center;
@@ -273,6 +282,109 @@ textarea:focus-visible {
   display: block;
   height: 100%;
   background: linear-gradient(90deg, var(--primary-color), var(--primary-muted));
+}
+
+.lock-vesting-timeline {
+  display: grid;
+  gap: 6px;
+}
+
+.lock-vesting-track {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--input-background);
+  overflow: visible;
+}
+
+.lock-vesting-track-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary-color), var(--primary-muted));
+  opacity: 0.28;
+}
+
+.lock-vesting-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+}
+
+.lock-vesting-marker-dot {
+  position: absolute;
+  inset: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  border: 1px solid #fff;
+  box-shadow: 0 0 0 1px var(--border-color);
+  background: var(--secondary-text-color);
+}
+
+.lock-vesting-marker-label {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--font-size-xs);
+  line-height: 1;
+  color: var(--secondary-text-color);
+  white-space: normal;
+  text-align: center;
+  min-width: 56px;
+  max-width: min(132px, 40vw);
+  overflow-wrap: anywhere;
+}
+
+.lock-vesting-marker--edge-left .lock-vesting-marker-label {
+  left: 0;
+  transform: none;
+  text-align: left;
+}
+
+.lock-vesting-marker--edge-right .lock-vesting-marker-label {
+  left: auto;
+  right: 0;
+  transform: none;
+  text-align: right;
+}
+
+.lock-vesting-marker--today .lock-vesting-marker-dot {
+  background: var(--warning-color);
+}
+
+.lock-vesting-marker--unlock .lock-vesting-marker-dot,
+.lock-vesting-marker--cliff .lock-vesting-marker-dot,
+.lock-vesting-marker--end .lock-vesting-marker-dot {
+  background: var(--primary-color);
+}
+
+.lock-vesting-axis,
+.lock-vesting-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--font-size-xs);
+  color: var(--secondary-text-color);
+  flex-wrap: wrap;
+}
+
+.lock-vesting-axis {
+  margin-top: 30px;
+}
+
+.lock-vesting-axis > span,
+.lock-vesting-meta > span {
+  min-width: 0;
+  max-width: 48%;
+  overflow-wrap: anywhere;
 }
 
 .lock-grid {
@@ -428,6 +540,17 @@ textarea:focus-visible {
   .lock-progress-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .lock-vesting-axis,
+  .lock-vesting-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .lock-vesting-axis > span,
+  .lock-vesting-meta > span {
+    max-width: 100%;
   }
 }
 
@@ -928,4 +1051,3 @@ textarea:focus-visible {
     flex-direction: column;
   }
 }
-
