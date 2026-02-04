@@ -21,11 +21,6 @@ export class OverviewTab {
     if (!this.panel) return;
 
     this.panel.innerHTML = `
-      <div class="panel-header">
-        <h2>Overview</h2>
-        <p class="muted">Review existing locks and launch unlock/withdraw actions.</p>
-      </div>
-
       <section class="card" style="margin-bottom:18px;">
         <div class="panel-header">
           <div class="card-title-row">
