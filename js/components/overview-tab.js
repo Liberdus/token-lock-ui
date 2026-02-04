@@ -2,6 +2,7 @@ import { extractErrorMessage, normalizeErrorMessage } from '../utils/transaction
 
 const RATE_SCALE = 1_000_000_000_000;
 const SECONDS_PER_DAY = 86400;
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 export class OverviewTab {
   constructor() {
@@ -448,11 +449,17 @@ export class OverviewTab {
         : `Today • ${formatDate(now)}`;
 
     let vestingPhase = 'Schedule unavailable';
+    let scheduleUnavailableReason = '';
     if (hasUnlock && now < unlockTime) vestingPhase = 'Waiting for unlock';
     else if (hasCliff && now < cliffEnd) vestingPhase = 'In cliff period';
     else if (hasVestingWindow && now < vestingEnd) vestingPhase = 'Vesting in progress';
     else if (hasVestingWindow && now >= vestingEnd) vestingPhase = 'Vesting complete';
     else if (hasUnlock) vestingPhase = 'Unlocked';
+    else scheduleUnavailableReason = 'unlock time not set';
+
+    if (vestingPhase === 'Schedule unavailable' && scheduleUnavailableReason) {
+      vestingPhase = `${vestingPhase} - ${scheduleUnavailableReason}`;
+    }
 
     const nextMilestone = hasVestingWindow ? vestingEnd : (hasCliff ? cliffEnd : (hasUnlock ? unlockTime : null));
     const milestoneName = hasVestingWindow ? 'vesting end' : (hasCliff ? 'cliff end' : 'unlock');
@@ -483,26 +490,16 @@ export class OverviewTab {
 
     const withdrawShort = `${lock.withdrawAddress.slice(0, 6)}…${lock.withdrawAddress.slice(-4)}`;
     const creatorShort = `${lock.creator.slice(0, 6)}…${lock.creator.slice(-4)}`;
-    const me = (window.walletManager?.getAddress?.() || '').toLowerCase();
-    const unlockAllowed = me && lock.creator.toLowerCase() === me && !lock.unlocked;
-    const withdrawAddress = lock.withdrawAddress?.toLowerCase?.() || '';
-    const creatorAddress = lock.creator?.toLowerCase?.() || '';
-    const zero = '0x0000000000000000000000000000000000000000';
-    const withdrawAllowed = me && (withdrawAddress === me || (withdrawAddress === zero && creatorAddress === me));
+    const me = this._getCurrentAddress();
+    const isCreator = this._isCreator(lock, me);
+    const isWithdrawer = this._isWithdrawer(lock, me);
     const withdrawnRaw = lock.withdrawn?.toString?.() ?? lock.withdrawn ?? 0;
     const withdrawnZero = window.ethers?.BigNumber?.from
       ? window.ethers.BigNumber.from(withdrawnRaw).isZero()
       : Number(withdrawnRaw || 0) === 0;
-    const retractAllowed = me && lock.creator.toLowerCase() === me && withdrawnZero;
-
-    const unlockDisabled = !unlockAllowed;
-    const withdrawDisabled = !withdrawAllowed;
-    const unlockReason = !me
-      ? 'Connect your wallet to unlock.'
-      : (lock.unlocked ? 'This lock has already been unlocked.' : 'Only the lock creator can unlock.');
-    const withdrawReason = !me
-      ? 'Connect your wallet to withdraw.'
-      : 'Only the withdraw address can withdraw.';
+    const showUnlock = !!isCreator;
+    const showWithdraw = !!isWithdrawer;
+    const showRetract = !!(isCreator && withdrawnZero);
 
     return `
       <div class="card lock-card">
@@ -512,7 +509,7 @@ export class OverviewTab {
             <p class="muted">Token: ${meta.symbol || 'ERC20'} (${lock.token.slice(0, 6)}…${lock.token.slice(-4)})</p>
           </div>
           <div class="lock-actions">
-            ${retractAllowed ? `
+            ${showRetract ? `
             <button
               type="button"
               class="btn btn--danger"
@@ -521,26 +518,24 @@ export class OverviewTab {
               title="Retract this lock"
             >Retract</button>
             ` : ''}
-            <span class="disabled-action" data-disabled-reason="${unlockDisabled ? unlockReason : ''}">
+            ${showUnlock ? `
               <button
                 type="button"
                 class="btn btn--primary"
                 data-unlock-btn
                 data-unlock-id="${entry.id}"
-                ${unlockDisabled ? 'disabled aria-disabled="true" style="pointer-events:none;"' : ''}
-                title="${unlockDisabled ? unlockReason : 'Unlock this lock'}"
+                title="Unlock this lock"
               >Unlock</button>
-            </span>
-            <span class="disabled-action" data-disabled-reason="${withdrawDisabled ? withdrawReason : ''}">
+            ` : ''}
+            ${showWithdraw ? `
               <button
                 type="button"
                 class="btn"
                 data-withdraw-btn
                 data-withdraw-id="${entry.id}"
-                ${withdrawDisabled ? 'disabled aria-disabled="true" style="pointer-events:none;"' : ''}
-                title="${withdrawDisabled ? withdrawReason : 'Withdraw unlocked tokens'}"
+                title="Withdraw unlocked tokens"
               >Withdraw</button>
-            </span>
+            ` : ''}
           </div>
         </div>
 
@@ -684,8 +679,12 @@ export class OverviewTab {
   _openUnlockToast(lockId) {
     const id = Number(lockId);
     if (!Number.isFinite(id) || id < 0) return;
-    const me = (window.walletManager?.getAddress?.() || '').toLowerCase();
-    if (!me) return;
+    const lock = this._lockIndex.get(id);
+    const reason = this._getUnlockUnavailableReason(lock);
+    if (reason) {
+      this._showActionUnavailable(reason);
+      return;
+    }
     window.lockActionToasts?.openUnlockToast?.({ lockId: id });
   }
 
@@ -697,13 +696,95 @@ export class OverviewTab {
     window.lockActionToasts?.openRetractToast?.({ lockId: id });
   }
 
-  _openWithdrawToast(lockId) {
+  async _openWithdrawToast(lockId) {
     const id = Number(lockId);
     if (!Number.isFinite(id) || id < 0) return;
-    const me = (window.walletManager?.getAddress?.() || '').toLowerCase();
-    if (!me) return;
-    const lock = this._lockIndex.get(id);
+    const entry = this._locks.find((item) => item.id === id) || null;
+    const lock = entry?.lock || this._lockIndex.get(id);
+    const reason = this._getWithdrawUnavailableReason(lock, entry?.available ?? null);
+    if (reason) {
+      this._showActionUnavailable(reason);
+      return;
+    }
+
+    if (entry && (entry.available == null)) {
+      try {
+        const available = await window.contractManager.previewWithdrawable(id);
+        entry.available = available;
+        const refreshedReason = this._getWithdrawUnavailableReason(lock, available);
+        if (refreshedReason) {
+          this._showActionUnavailable(refreshedReason);
+          return;
+        }
+      } catch {
+        // Ignore preview errors and allow the withdraw form to load.
+      }
+    }
+
     window.lockActionToasts?.openWithdrawToast?.({ lockId: id, lock });
+  }
+
+  _getCurrentAddress() {
+    return (window.walletManager?.getAddress?.() || '').toLowerCase();
+  }
+
+  _isCreator(lock, me = this._getCurrentAddress()) {
+    if (!lock || !me) return false;
+    return lock.creator?.toLowerCase?.() === me;
+  }
+
+  _isWithdrawer(lock, me = this._getCurrentAddress()) {
+    if (!lock || !me) return false;
+    const withdrawAddress = lock.withdrawAddress?.toLowerCase?.() || '';
+    const creatorAddress = lock.creator?.toLowerCase?.() || '';
+    return withdrawAddress === me || (withdrawAddress === ZERO_ADDRESS && creatorAddress === me);
+  }
+
+  _getUnlockUnavailableReason(lock) {
+    if (!lock) return 'Lock not found.';
+    if (!this._isCreator(lock)) return 'Only the lock creator can unlock.';
+    if (lock.unlocked) return 'This lock has already been unlocked.';
+    return '';
+  }
+
+  _isZeroAmount(value) {
+    if (value == null) return false;
+    if (window.ethers?.BigNumber?.from) {
+      try {
+        return window.ethers.BigNumber.from(value).isZero();
+      } catch {
+        // Fallback to number parsing below.
+      }
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed === 0;
+  }
+
+  _getWithdrawUnavailableReason(lock, available = null) {
+    if (!lock) return 'Lock not found.';
+    if (!this._isWithdrawer(lock)) return 'Only the withdraw address can withdraw.';
+    if (!lock.unlocked) return 'This lock is not unlocked.';
+
+    const now = Math.floor(Date.now() / 1000);
+    const unlockTime = Number(lock.unlockTime?.toString?.() ?? lock.unlockTime ?? 0);
+    const cliffDays = Number(lock.cliffDays?.toString?.() ?? lock.cliffDays ?? 0);
+    if (unlockTime > now) return 'Unlock time has not been reached.';
+    const cliffEnd = unlockTime > 0 ? unlockTime + (cliffDays * SECONDS_PER_DAY) : 0;
+    if (cliffEnd > now) return 'Cliff period is active. Withdrawals start after the cliff ends.';
+
+    if (available != null && this._isZeroAmount(available)) return 'No tokens are available to withdraw right now.';
+
+    return '';
+  }
+
+  _showActionUnavailable(message) {
+    if (!message) return;
+    window.toastManager?.show?.({
+      type: 'warning',
+      title: 'Action unavailable',
+      message,
+      timeoutMs: 5000,
+    });
   }
 
   _getPageSize() {
