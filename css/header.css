@@ -19,10 +19,22 @@
   padding: 14px var(--container-padding);
 }
 
-.header-toolbar > .tab-bar {
+.header-tabs-row {
   flex: 0 0 100%;
   width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-top: 2px;
+}
+
+.header-tabs-row > .tab-bar {
+  flex: 1;
+  min-width: 0;
+}
+
+.lock-action-btn {
+  flex-shrink: 0;
 }
 
 .header-toolbar > .logo-link {
@@ -169,7 +181,13 @@
     flex-shrink: 0;
   }
 
-  .header-toolbar > .tab-bar {
+  .header-tabs-row {
+    gap: 8px;
     margin-top: 0;
+  }
+
+  .lock-action-btn {
+    padding: 8px 10px;
+    font-size: var(--font-size-xs);
   }
 }

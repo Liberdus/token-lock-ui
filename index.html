@@ -54,49 +54,43 @@
             </button>
           </nav>
 
-          <div class="tab-bar" role="tablist" aria-label="Token lock sections">
-            <button
-              class="tab-button is-active"
-              type="button"
-              role="tab"
-              aria-selected="true"
-              aria-controls="panel-overview"
-              data-tab="overview"
-            >
-              Active Locks
-            </button>
-            <button
-              class="tab-button"
-              type="button"
-              role="tab"
-              aria-selected="false"
-              aria-controls="panel-lock"
-              data-tab="lock"
-              tabindex="-1"
-            >
+          <div class="header-tabs-row">
+            <div class="tab-bar" role="tablist" aria-label="Token lock sections">
+              <button
+                class="tab-button is-active"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="panel-overview"
+                data-tab="overview"
+              >
+                Active Locks
+              </button>
+              <button
+                class="tab-button"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-parameters"
+                data-tab="parameters"
+                tabindex="-1"
+              >
+                Parameters
+              </button>
+              <button
+                class="tab-button"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="panel-history"
+                data-tab="history"
+                tabindex="-1"
+              >
+                History
+              </button>
+            </div>
+            <button type="button" class="btn btn--primary lock-action-btn" id="open-lock-action-btn">
               Lock
-            </button>
-            <button
-              class="tab-button"
-              type="button"
-              role="tab"
-              aria-selected="false"
-              aria-controls="panel-parameters"
-              data-tab="parameters"
-              tabindex="-1"
-            >
-              Parameters
-            </button>
-            <button
-              class="tab-button"
-              type="button"
-              role="tab"
-              aria-selected="false"
-              aria-controls="panel-history"
-              data-tab="history"
-              tabindex="-1"
-            >
-              History
             </button>
           </div>
         </div>
