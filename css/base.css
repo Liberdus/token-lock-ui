@@ -860,6 +860,27 @@ textarea:focus-visible {
   padding: 0 2px;
 }
 
+.field--inline-readonly {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.field--inline-readonly .field-label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.field--inline-readonly .field-readonly {
+  min-height: 0;
+  padding: 0;
+  margin-left: 0;
+  justify-content: flex-start;
+  text-align: left;
+}
+
 .actions {
   margin-top: 14px;
   display: flex;

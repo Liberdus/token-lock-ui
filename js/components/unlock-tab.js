@@ -206,17 +206,17 @@ export class LockActionToasts {
   _renderWithdrawFormHtml() {
     return `
       <div class="form-grid">
-        <div class="field">
+        <div class="field field--inline-readonly">
           <span class="field-label">Lock ID</span>
-          <div class="field-input" data-withdraw-lock>—</div>
+          <div class="field-readonly" data-withdraw-lock>—</div>
         </div>
-        <div class="field">
+        <div class="field field--inline-readonly">
           <span class="field-label">Token</span>
-          <div class="field-input" data-withdraw-token>—</div>
+          <div class="field-readonly" data-withdraw-token>—</div>
         </div>
-        <div class="field">
+        <div class="field field--inline-readonly">
           <span class="field-label">Available Now</span>
-          <div class="field-input" data-withdraw-available>—</div>
+          <div class="field-readonly" data-withdraw-available>—</div>
         </div>
         <label class="field">
           <span class="field-label">Amount (tokens)</span>
@@ -241,7 +241,7 @@ export class LockActionToasts {
   _renderRetractFormHtml() {
     return `
       <div class="form-grid">
-        <div class="field">
+        <div class="field field--inline-readonly">
           <span class="field-label">Lock ID</span>
           <div class="field-readonly" data-retract-id>—</div>
         </div>
@@ -263,11 +263,11 @@ export class LockActionToasts {
           <span class="field-label">Token Address</span>
           <input class="field-input" data-lock-token placeholder="Enter token address (0x...)" />
         </label>
-        <label class="field">
+        <label class="field field--inline-readonly">
           <span class="field-label">Token Symbol</span>
           <div class="field-readonly" data-lock-symbol>—</div>
         </label>
-        <label class="field">
+        <label class="field field--inline-readonly">
           <span class="field-label">Token Decimals</span>
           <div class="field-readonly" data-lock-decimals>—</div>
         </label>
@@ -283,7 +283,7 @@ export class LockActionToasts {
           <span class="field-label">Vesting Duration (days)</span>
           <input class="field-input" data-lock-duration type="number" min="1" step="1" placeholder="Enter vesting duration (e.g. 365 days)" />
         </label>
-        <label class="field">
+        <label class="field field--inline-readonly">
           <span class="field-label">Daily %</span>
           <div class="field-readonly" data-lock-rate-pct>—</div>
         </label>

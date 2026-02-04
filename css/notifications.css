@@ -88,6 +88,10 @@
   width: 100%;
 }
 
+.notification.notification--form .field--inline-readonly .field-readonly {
+  width: auto;
+}
+
 .notification.notification--form .form-grid {
   margin-top: 0;
 }
