@@ -2,7 +2,6 @@ import { CONFIG } from './config.js';
 import { Header } from './components/header.js';
 import { TabBar } from './components/tab-bar.js';
 import { OverviewTab } from './components/overview-tab.js';
-import { LockTab } from './components/lock-tab.js';
 import { LockActionToasts } from './components/unlock-tab.js';
 import { ParametersTab } from './components/parameters-tab.js';
 import { HistoryTab } from './components/history-tab.js';
@@ -16,7 +15,6 @@ import { ContractManager } from './contracts/contract-manager.js';
 const header = new Header();
 const tabBar = new TabBar();
 const overviewTab = new OverviewTab();
-const lockTab = new LockTab();
 const lockActionToasts = new LockActionToasts();
 const parametersTab = new ParametersTab();
 const historyTab = new HistoryTab();
@@ -57,7 +55,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   header.load();
 
   overviewTab.load();
-  lockTab.load();
   lockActionToasts.load();
   parametersTab.load();
   historyTab.load();

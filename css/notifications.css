@@ -59,6 +59,8 @@
 .notification.notification--form {
   max-width: 420px;
   width: min(92vw, 420px);
+  min-width: 0;
+  max-height: calc(100dvh - 48px);
   text-align: left;
   align-items: flex-start;
 }
@@ -69,6 +71,10 @@
 
 .notification.notification--form .notification-content {
   width: 100%;
+  max-height: calc(100dvh - 96px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
 }
 
 .notification.notification--form .form-grid {
@@ -238,6 +244,15 @@
     width: calc(100% - 24px);
     max-width: none;
     padding: 0;
+  }
+
+  .notification.notification--form {
+    width: 100%;
+    max-height: calc(100dvh - 32px);
+  }
+
+  .notification.notification--form .notification-content {
+    max-height: calc(100dvh - 80px);
   }
 }
 
