@@ -21,7 +21,7 @@ export class OverviewTab {
     if (!this.panel) return;
 
     this.panel.innerHTML = `
-      <section class="card" style="margin-bottom:18px;">
+      <section class="card" style="margin-bottom:12px;">
         <div class="panel-header">
           <div class="card-title-row">
             <h2>Active Locks</h2>
@@ -472,6 +472,7 @@ export class OverviewTab {
     const cliffDurationLabel = formatMonthsDays(cliffDays);
     const vestingDurationLabel = formatMonthsDays(vestingDays);
 
+    const tokenShort = `${lock.token.slice(0, 6)}…${lock.token.slice(-4)}`;
     const withdrawShort = `${lock.withdrawAddress.slice(0, 6)}…${lock.withdrawAddress.slice(-4)}`;
     const creatorShort = `${lock.creator.slice(0, 6)}…${lock.creator.slice(-4)}`;
     const me = this._getCurrentAddress();
@@ -488,7 +489,14 @@ export class OverviewTab {
         <div class="lock-header">
           <div>
             <h2 class="lock-title">Lock #${entry.id}</h2>
-            <p class="muted">Token: ${meta.symbol || 'ERC20'} (${lock.token.slice(0, 6)}…${lock.token.slice(-4)})</p>
+            <p class="muted lock-address" title="${lock.token}">
+              <span>Token: ${meta.symbol || 'ERC20'} (${tokenShort})</span>
+              <button type="button" class="btn btn--ghost btn--icon" data-copy="${lock.token}" aria-label="Copy token address">
+                <svg class="icon icon-copy" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M8 8a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8zm-3 9V7a4 4 0 0 1 4-4h7" />
+                </svg>
+              </button>
+            </p>
           </div>
           <div class="lock-actions">
             ${showRetract ? `

@@ -3,6 +3,9 @@
    ============================================================ */
 
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
   border-bottom: 1px solid var(--border-color);
   background: var(--background-color);
 }
@@ -11,8 +14,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 14px var(--container-padding);
+}
+
+.header-toolbar > .tab-bar {
+  flex: 0 0 100%;
+  width: 100%;
+  margin-top: 2px;
 }
 
 .header-toolbar > .logo-link {
@@ -102,7 +112,7 @@
 
 @media (max-width: 768px) {
   .header-toolbar {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 8px;
     padding: 10px var(--container-padding);
     align-items: center;
@@ -158,5 +168,8 @@
     text-overflow: ellipsis;
     flex-shrink: 0;
   }
-}
 
+  .header-toolbar > .tab-bar {
+    margin-top: 0;
+  }
+}

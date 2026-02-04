@@ -62,11 +62,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   parametersTab.load();
   historyTab.load();
 
-  const clearBtn = document.getElementById('app-clear-cache');
-  clearBtn?.addEventListener('click', () => {
-    window.toastManager?.success('No cached data to clear.', { title: 'Cache' });
-  });
-
   // Load TabBar last so the initial `tabActivated` event
   // is received by all tab components (lazy tab loading).
   tabBar.load();
