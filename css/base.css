@@ -343,6 +343,14 @@ textarea:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.lock-vesting-marker--offset-up .lock-vesting-marker-label {
+  top: -6px;
+}
+
+.lock-vesting-marker--offset-down .lock-vesting-marker-label {
+  top: 22px;
+}
+
 .lock-vesting-marker--edge-left .lock-vesting-marker-label {
   left: 0;
   transform: none;

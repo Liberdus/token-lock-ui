@@ -405,11 +405,39 @@ export class OverviewTab {
       if (pct >= 92) return ' lock-vesting-marker--edge-right';
       return '';
     };
+    const markerOffsetClass = (markerKey, markerOffsets) => markerOffsets.get(markerKey) || '';
     const todayMarkerPct = timelinePct(now);
     const unlockMarkerPct = hasUnlock ? timelinePct(unlockTime) : 0;
     const cliffMarkerPct = hasCliff ? timelinePct(cliffEnd) : 0;
     const vestingEndMarkerPct = hasVestingWindow ? timelinePct(vestingEnd) : 0;
     const showTodayMarker = now < timelineEndRaw;
+    const markerOffsets = new Map();
+    const markers = [];
+    if (hasUnlock) markers.push({ key: 'unlock', pct: unlockMarkerPct });
+    if (hasCliff) markers.push({ key: 'cliff', pct: cliffMarkerPct });
+    if (hasVestingWindow) markers.push({ key: 'end', pct: vestingEndMarkerPct });
+    if (showTodayMarker) markers.push({ key: 'today', pct: todayMarkerPct });
+    markers.sort((a, b) => a.pct - b.pct);
+    const offsetThresholdPct = 6;
+    let clusterIndex = 0;
+    markers.forEach((marker, idx) => {
+      if (idx === 0) {
+        markerOffsets.set(marker.key, '');
+        return;
+      }
+      const prev = markers[idx - 1];
+      if (Math.abs(marker.pct - prev.pct) < offsetThresholdPct) {
+        clusterIndex += 1;
+      } else {
+        clusterIndex = 0;
+      }
+      const offsetClass = clusterIndex === 0
+        ? ''
+        : clusterIndex % 2 === 1
+          ? ' lock-vesting-marker--offset-up'
+          : ' lock-vesting-marker--offset-down';
+      markerOffsets.set(marker.key, offsetClass);
+    });
     const timelineLeftLabel = hasUnlock && now >= unlockTime
       ? `Unlock • ${formatDate(unlockTime)}`
       : `Today • ${formatDate(now)}`;
@@ -525,25 +553,25 @@ export class OverviewTab {
             <div class="lock-vesting-track">
               <span class="lock-vesting-track-fill" style="width:${todayMarkerPct.toFixed(2)}%"></span>
               ${hasUnlock ? `
-              <span class="lock-vesting-marker lock-vesting-marker--unlock${markerEdgeClass(unlockMarkerPct)}" style="left:${unlockMarkerPct.toFixed(2)}%">
+              <span class="lock-vesting-marker lock-vesting-marker--unlock${markerEdgeClass(unlockMarkerPct)}${markerOffsetClass('unlock', markerOffsets)}" style="left:${unlockMarkerPct.toFixed(2)}%">
                 <span class="lock-vesting-marker-dot"></span>
                 <span class="lock-vesting-marker-label">Unlock</span>
               </span>
               ` : ''}
               ${hasCliff ? `
-              <span class="lock-vesting-marker lock-vesting-marker--cliff${markerEdgeClass(cliffMarkerPct)}" style="left:${cliffMarkerPct.toFixed(2)}%">
+              <span class="lock-vesting-marker lock-vesting-marker--cliff${markerEdgeClass(cliffMarkerPct)}${markerOffsetClass('cliff', markerOffsets)}" style="left:${cliffMarkerPct.toFixed(2)}%">
                 <span class="lock-vesting-marker-dot"></span>
                 <span class="lock-vesting-marker-label">Cliff end</span>
               </span>
               ` : ''}
               ${hasVestingWindow ? `
-              <span class="lock-vesting-marker lock-vesting-marker--end${markerEdgeClass(vestingEndMarkerPct)}" style="left:${vestingEndMarkerPct.toFixed(2)}%">
+              <span class="lock-vesting-marker lock-vesting-marker--end${markerEdgeClass(vestingEndMarkerPct)}${markerOffsetClass('end', markerOffsets)}" style="left:${vestingEndMarkerPct.toFixed(2)}%">
                 <span class="lock-vesting-marker-dot"></span>
                 <span class="lock-vesting-marker-label">Vesting end</span>
               </span>
               ` : ''}
               ${showTodayMarker ? `
-              <span class="lock-vesting-marker lock-vesting-marker--today${markerEdgeClass(todayMarkerPct)}" style="left:${todayMarkerPct.toFixed(2)}%">
+              <span class="lock-vesting-marker lock-vesting-marker--today${markerEdgeClass(todayMarkerPct)}${markerOffsetClass('today', markerOffsets)}" style="left:${todayMarkerPct.toFixed(2)}%">
                 <span class="lock-vesting-marker-dot"></span>
                 <span class="lock-vesting-marker-label">Today</span>
               </span>
