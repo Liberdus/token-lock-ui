@@ -284,6 +284,9 @@ export class OverviewTab {
     this.locksListEl.querySelectorAll('[data-copy]')?.forEach((btn) => {
       btn.addEventListener('click', () => this._copyAddress(btn.dataset.copy));
     });
+    this.locksListEl.querySelectorAll('[data-retract-btn]')?.forEach((btn) => {
+      btn.addEventListener('click', () => this._openRetractToast(btn.dataset.retractId));
+    });
     this.locksListEl.querySelectorAll('[data-unlock-btn]')?.forEach((btn) => {
       btn.addEventListener('click', () => this._openUnlockToast(btn.dataset.unlockId));
     });
@@ -348,6 +351,11 @@ export class OverviewTab {
     const creatorAddress = lock.creator?.toLowerCase?.() || '';
     const zero = '0x0000000000000000000000000000000000000000';
     const withdrawAllowed = me && (withdrawAddress === me || (withdrawAddress === zero && creatorAddress === me));
+    const withdrawnRaw = lock.withdrawn?.toString?.() ?? lock.withdrawn ?? 0;
+    const withdrawnZero = window.ethers?.BigNumber?.from
+      ? window.ethers.BigNumber.from(withdrawnRaw).isZero()
+      : Number(withdrawnRaw || 0) === 0;
+    const retractAllowed = me && lock.creator.toLowerCase() === me && withdrawnZero;
 
     const unlockDisabled = !unlockAllowed;
     const withdrawDisabled = !withdrawAllowed;
@@ -366,6 +374,15 @@ export class OverviewTab {
             <p class="muted">Token: ${meta.symbol || 'ERC20'} (${lock.token.slice(0, 6)}…${lock.token.slice(-4)})</p>
           </div>
           <div class="lock-actions">
+            ${retractAllowed ? `
+            <button
+              type="button"
+              class="btn btn--danger"
+              data-retract-btn
+              data-retract-id="${entry.id}"
+              title="Retract this lock"
+            >Retract</button>
+            ` : ''}
             <span class="disabled-action" data-disabled-reason="${unlockDisabled ? unlockReason : ''}">
               <button
                 type="button"
@@ -498,6 +515,14 @@ export class OverviewTab {
     const me = (window.walletManager?.getAddress?.() || '').toLowerCase();
     if (!me) return;
     window.lockActionToasts?.openUnlockToast?.({ lockId: id });
+  }
+
+  _openRetractToast(lockId) {
+    const id = Number(lockId);
+    if (!Number.isFinite(id) || id < 0) return;
+    const me = (window.walletManager?.getAddress?.() || '').toLowerCase();
+    if (!me) return;
+    window.lockActionToasts?.openRetractToast?.({ lockId: id });
   }
 
   _openWithdrawToast(lockId) {

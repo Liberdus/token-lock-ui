@@ -476,6 +476,17 @@ textarea:focus-visible {
   border-color: var(--primary-hover);
 }
 
+.btn--danger {
+  background: var(--danger-color);
+  border-color: var(--danger-color);
+  color: #fff;
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: var(--danger-strong);
+  border-color: var(--danger-strong);
+}
+
 .btn--ghost {
   background: transparent;
 }

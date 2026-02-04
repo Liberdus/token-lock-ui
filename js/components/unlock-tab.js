@@ -92,6 +92,34 @@ export class LockActionToasts {
     this.withdrawSubmitBtn?.addEventListener('click', () => this._submitWithdraw());
   }
 
+  openRetractToast({ lockId } = {}) {
+    const message = this._renderRetractFormHtml();
+    const id = window.toastManager?.show?.({
+      id: 'retract-form-toast',
+      title: 'Retract Lock',
+      message,
+      type: 'info',
+      dismissible: true,
+      timeoutMs: 0,
+      allowHtml: true,
+      className: 'notification--form',
+    });
+
+    const toastEl = document.querySelector(`[data-toast-id="${id}"]`);
+    const root = toastEl?.querySelector?.('.notification-message');
+    if (!root) return;
+
+    this.retractIdInput = root.querySelector('[data-retract-id]');
+    this.retractToInput = root.querySelector('[data-retract-to]');
+    this.retractSubmitBtn = root.querySelector('[data-retract-submit]');
+
+    if (lockId != null) {
+      this.retractIdInput.value = String(lockId);
+    }
+
+    this.retractSubmitBtn?.addEventListener('click', () => this._submitRetract());
+  }
+
   _renderUnlockFormHtml() {
     return `
       <div class="form-grid">
@@ -144,6 +172,24 @@ export class LockActionToasts {
         <button type="button" class="btn" data-withdraw-refresh>Refresh Available</button>
         <button type="button" class="btn" data-withdraw-max>Use 100%</button>
         <button type="button" class="btn btn--primary" data-withdraw-submit>Withdraw</button>
+      </div>
+    `;
+  }
+
+  _renderRetractFormHtml() {
+    return `
+      <div class="form-grid">
+        <label class="field">
+          <span class="field-label">Lock ID</span>
+          <input class="field-input" data-retract-id type="number" min="0" step="1" placeholder="0" />
+        </label>
+        <label class="field">
+          <span class="field-label">Retract To (optional)</span>
+          <input class="field-input" data-retract-to placeholder="Defaults to creator" />
+        </label>
+      </div>
+      <div class="actions" style="gap: 10px; flex-wrap: wrap;">
+        <button type="button" class="btn btn--primary" data-retract-submit>Retract</button>
       </div>
     `;
   }
@@ -267,6 +313,32 @@ export class LockActionToasts {
     } catch (err) {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Withdraw failed'));
       window.toastManager?.error(msg, { title: 'Withdraw failed' });
+    }
+  }
+
+  async _submitRetract() {
+    try {
+      const lockId = Number(this.retractIdInput?.value || 0);
+      if (!Number.isFinite(lockId) || lockId < 0) throw new Error('Invalid lock ID');
+      const to = (this.retractToInput?.value || '').trim();
+
+      const loadingId = window.toastManager?.loading('Submitting retract...', { delayMs: 0 });
+      const tx = await window.contractManager.retract({
+        lockId,
+        to: to || ZERO_ADDRESS,
+      });
+      const receipt = await tx.wait();
+      window.toastManager?.update(loadingId, {
+        type: 'success',
+        title: 'Retracted',
+        message: formatTxMessage(receipt.transactionHash, 'Retract confirmed.'),
+        allowHtml: true,
+        timeoutMs: 0,
+      });
+      window.overviewTab?.refreshLocks?.();
+    } catch (err) {
+      const msg = normalizeErrorMessage(extractErrorMessage(err, 'Retract failed'));
+      window.toastManager?.error(msg, { title: 'Retract failed' });
     }
   }
 
