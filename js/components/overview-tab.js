@@ -11,6 +11,7 @@ export class OverviewTab {
     this._lockIndex = new Map();
     this._tokenMeta = new Map();
     this._tokens = new Set();
+    this._expandedLockDetails = new Set();
     this._scanInFlight = false;
     this._currentPage = 1;
   }
@@ -55,17 +56,6 @@ export class OverviewTab {
               <option value="">All tokens</option>
             </select>
           </label>
-          <label class="lock-filter-field">
-            <span class="field-label">Add token</span>
-            <div class="lock-filter-input">
-              <input class="field-input" data-filter-token-input placeholder="0x..." />
-              <button type="button" class="btn" data-filter-token-add>Add</button>
-            </div>
-          </label>
-        </div>
-
-        <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
-          <div class="muted" data-locks-status></div>
         </div>
 
         <div data-locks-list></div>
@@ -99,14 +89,11 @@ export class OverviewTab {
 
   _bind() {
     this.locksListEl = this.panel.querySelector('[data-locks-list]');
-    this.statusEl = this.panel.querySelector('[data-locks-status]');
     this.refreshBtn = this.panel.querySelector('[data-overview-refresh]');
     this.filterMine = this.panel.querySelector('[data-filter-mine]');
     this.filterWithdraw = this.panel.querySelector('[data-filter-withdraw]');
     this.filterMineOrWithdraw = this.panel.querySelector('[data-filter-mine-or-withdraw]');
     this.filterToken = this.panel.querySelector('[data-filter-token]');
-    this.filterTokenInput = this.panel.querySelector('[data-filter-token-input]');
-    this.filterTokenAdd = this.panel.querySelector('[data-filter-token-add]');
     this.pageSizeSelect = this.panel.querySelector('[data-overview-page-size]');
     this.countEl = this.panel.querySelector('[data-overview-count]');
     this.loadMoreBtn = this.panel.querySelector('[data-overview-load-more]');
@@ -122,7 +109,6 @@ export class OverviewTab {
     });
     this.filterMineOrWithdraw?.addEventListener('change', () => this._handleMineOrWithdrawToggle());
     this.filterToken?.addEventListener('change', () => this._resetAndRender());
-    this.filterTokenAdd?.addEventListener('click', () => this._addTokenFilter());
     this.pageSizeSelect?.addEventListener('change', () => {
       this._savePreferences();
       this._resetAndRender();
@@ -165,14 +151,9 @@ export class OverviewTab {
     return this._tokenMeta.get(key);
   }
 
-  _setStatus(message) {
-    if (this.statusEl) this.statusEl.textContent = message || '';
-  }
-
   async refreshLocks() {
     if (this._scanInFlight) return;
     this._scanInFlight = true;
-    this._setStatus('Loading active locks...');
 
     try {
       const count = await window.contractManager.getActiveLockCount();
@@ -181,17 +162,14 @@ export class OverviewTab {
       const ids = [];
       const pageSize = 50;
       for (let offset = 0; offset < count; offset += pageSize) {
-        this._setStatus(`Loading locks ${offset + 1} - ${Math.min(count, offset + pageSize)}...`);
         const batch = await window.contractManager.getActiveLockIds(offset, pageSize);
         ids.push(...batch);
       }
 
       await this._loadLocks(ids);
-      this._setStatus(`Loaded ${this._locks.length} locks.`);
     } catch (err) {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Failed to load locks'));
       window.toastManager?.error(msg, { title: 'Load failed' });
-      this._setStatus('Load failed.');
     } finally {
       this._scanInFlight = false;
     }
@@ -214,6 +192,10 @@ export class OverviewTab {
 
     this._locks = locks;
     this._lockIndex = new Map(locks.map((l) => [l.id, l.lock]));
+    const validIds = new Set(locks.map((entry) => entry.id));
+    this._expandedLockDetails = new Set(
+      Array.from(this._expandedLockDetails).filter((id) => validIds.has(id))
+    );
     this._refreshTokenFilterOptions();
     await this._primeTokenMeta();
     await this._primeAvailable();
@@ -334,6 +316,9 @@ export class OverviewTab {
 
     this.locksListEl.querySelectorAll('[data-copy]')?.forEach((btn) => {
       btn.addEventListener('click', () => this._copyAddress(btn.dataset.copy));
+    });
+    this.locksListEl.querySelectorAll('[data-lock-details-toggle]')?.forEach((btn) => {
+      btn.addEventListener('click', () => this._toggleLockDetails(btn.dataset.lockDetailsToggle));
     });
     this.locksListEl.querySelectorAll('[data-retract-btn]')?.forEach((btn) => {
       btn.addEventListener('click', () => this._openRetractToast(btn.dataset.retractId));
@@ -500,6 +485,8 @@ export class OverviewTab {
     const showUnlock = !!isCreator;
     const showWithdraw = !!isWithdrawer;
     const showRetract = !!(isCreator && withdrawnZero);
+    const detailsExpanded = this._expandedLockDetails.has(entry.id);
+    const detailsArrow = detailsExpanded ? '▼' : '▶';
 
     return `
       <div class="card lock-card">
@@ -530,7 +517,7 @@ export class OverviewTab {
             ${showWithdraw ? `
               <button
                 type="button"
-                class="btn"
+                class="btn btn--success"
                 data-withdraw-btn
                 data-withdraw-id="${entry.id}"
                 title="Withdraw unlocked tokens"
@@ -583,7 +570,19 @@ export class OverviewTab {
           </div>
         </div>
 
-        <div class="lock-grid">
+        <button
+          type="button"
+          class="btn lock-details-toggle"
+          data-lock-details-toggle="${entry.id}"
+          aria-expanded="${detailsExpanded ? 'true' : 'false'}"
+          aria-controls="lock-details-${entry.id}"
+        >Lock Details ${detailsArrow}</button>
+
+        <div
+          class="lock-grid"
+          id="lock-details-${entry.id}"
+          ${detailsExpanded ? '' : 'hidden'}
+        >
           <div class="lock-group">
             <div class="lock-group-title">Balances</div>
             <div class="lock-kv">
@@ -655,16 +654,15 @@ export class OverviewTab {
     `;
   }
 
-  _addTokenFilter() {
-    const addr = (this.filterTokenInput?.value || '').trim().toLowerCase();
-    if (!addr) return;
-    if (!this._tokens.has(addr)) {
-      this._tokens.add(addr);
-      this._refreshTokenFilterOptions();
-      this.filterToken.value = addr;
-      this.renderLocks();
+  _toggleLockDetails(lockId) {
+    const id = Number(lockId);
+    if (!Number.isFinite(id) || id < 0) return;
+    if (this._expandedLockDetails.has(id)) {
+      this._expandedLockDetails.delete(id);
+    } else {
+      this._expandedLockDetails.add(id);
     }
-    this.filterTokenInput.value = '';
+    this.renderLocks();
   }
 
   async _copyAddress(addr) {

@@ -257,6 +257,10 @@ textarea:focus-visible {
   margin-bottom: 0;
 }
 
+.lock-details-toggle {
+  margin-bottom: 12px;
+}
+
 .lock-progress-header {
   display: flex;
   align-items: center;
@@ -401,6 +405,10 @@ textarea:focus-visible {
   gap: 12px;
 }
 
+.lock-grid[hidden] {
+  display: none !important;
+}
+
 .lock-group {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -532,12 +540,6 @@ textarea:focus-visible {
   gap: 6px;
 }
 
-.lock-filter-input {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
 @media (max-width: 900px) {
   .lock-filters {
     grid-template-columns: 1fr;
@@ -616,6 +618,18 @@ textarea:focus-visible {
 .btn--danger:hover:not(:disabled) {
   background: var(--danger-strong);
   border-color: var(--danger-strong);
+}
+
+.btn--success {
+  background: var(--success-color);
+  border-color: var(--success-color);
+  color: #fff;
+}
+
+.btn--success:hover:not(:disabled) {
+  background: var(--success-color);
+  border-color: var(--success-color);
+  filter: brightness(0.92);
 }
 
 .btn--ghost {

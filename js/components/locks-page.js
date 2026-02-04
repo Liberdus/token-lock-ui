@@ -44,13 +44,6 @@ export class LocksPage {
               <option value="">All tokens</option>
             </select>
           </label>
-          <label class="field">
-            <span class="field-label">Add token address</span>
-            <div style="display:flex; gap:8px;">
-              <input class="field-input" data-filter-token-input placeholder="0x..." />
-              <button type="button" class="btn" data-filter-token-add>Add</button>
-            </div>
-          </label>
         </div>
 
         <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
@@ -209,14 +202,11 @@ export class LocksPage {
     this.filterMine = this.root.querySelector('[data-filter-mine]');
     this.filterWithdraw = this.root.querySelector('[data-filter-withdraw]');
     this.filterToken = this.root.querySelector('[data-filter-token]');
-    this.filterTokenInput = this.root.querySelector('[data-filter-token-input]');
-    this.filterTokenAdd = this.root.querySelector('[data-filter-token-add]');
 
     this.refreshBtn?.addEventListener('click', () => this.refreshLocks());
     this.filterMine?.addEventListener('change', () => this.renderLocks());
     this.filterWithdraw?.addEventListener('change', () => this.renderLocks());
     this.filterToken?.addEventListener('change', () => this.renderLocks());
-    this.filterTokenAdd?.addEventListener('click', () => this._addTokenFilter());
 
     this.tokenInput = this.root.querySelector('[data-lock-token]');
     this.decimalsInput = this.root.querySelector('[data-lock-decimals]');
@@ -496,18 +486,6 @@ export class LocksPage {
         </div>
       </div>
     `;
-  }
-
-  _addTokenFilter() {
-    const addr = (this.filterTokenInput?.value || '').trim().toLowerCase();
-    if (!addr) return;
-    if (!this._tokens.has(addr)) {
-      this._tokens.add(addr);
-      this._refreshTokenFilterOptions();
-      this.filterToken.value = addr;
-      this.renderLocks();
-    }
-    this.filterTokenInput.value = '';
   }
 
   async _copyAddress(addr) {
