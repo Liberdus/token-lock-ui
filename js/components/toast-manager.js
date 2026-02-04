@@ -244,7 +244,7 @@ export class ToastManager {
         }
       }
 
-      if (tag === 'select' || tag === 'div' || tag === 'label' || tag === 'span') {
+      if (tag === 'select' || tag === 'div' || tag === 'label' || tag === 'span' || tag === 'a') {
         node.childNodes.forEach((child) => appendSanitized(child, el));
         if (!el.childNodes.length) {
           el.textContent = node.textContent || '';
@@ -281,4 +281,3 @@ export class ToastManager {
     return true;
   }
 }
-

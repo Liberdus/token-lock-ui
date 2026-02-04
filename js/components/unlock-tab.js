@@ -2,6 +2,7 @@ import { extractErrorMessage, normalizeErrorMessage, formatTxMessage } from '../
 
 const RATE_SCALE = 1_000_000_000_000;
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+const UNLOCK_TIME_BUFFER_SECONDS = 60;
 
 export class LockActionToasts {
   constructor() {
@@ -30,17 +31,15 @@ export class LockActionToasts {
     const root = toastEl?.querySelector?.('.notification-message');
     if (!root) return;
 
-    this.lockIdInput = root.querySelector('[data-unlock-id]');
+    this._unlockFormToastId = id;
     this.unlockTimeInput = root.querySelector('[data-unlock-time]');
-    this.nowBtn = root.querySelector('[data-unlock-now]');
     this.submitBtn = root.querySelector('[data-unlock-submit]');
+    this._activeLockId = Number.isFinite(lockId) ? Number(lockId) : lockId;
+    const earliestUnlockTime = Math.floor(Date.now() / 1000) + UNLOCK_TIME_BUFFER_SECONDS;
+    this._setUnlockInputMin(earliestUnlockTime);
+    this._setUnlockInputValue(this._getLocalDateTimeString(new Date(earliestUnlockTime * 1000)));
 
-    if (lockId != null) {
-      this.lockIdInput.value = String(lockId);
-      this._setNowPlus();
-    }
-
-    this.nowBtn?.addEventListener('click', () => this._setNowPlus());
+    this.unlockTimeInput?.addEventListener('input', () => this._enforceUnlockTimeMin());
     this.submitBtn?.addEventListener('click', () => this._submitUnlock());
   }
 
@@ -124,16 +123,11 @@ export class LockActionToasts {
     return `
       <div class="form-grid">
         <label class="field">
-          <span class="field-label">Lock ID</span>
-          <input class="field-input" data-unlock-id type="number" min="0" step="1" placeholder="0" />
-        </label>
-        <label class="field">
-          <span class="field-label">Unlock Time (Unix seconds)</span>
-          <input class="field-input" data-unlock-time type="number" min="0" step="1" placeholder="e.g. 1770145427" />
+          <span class="field-label">Unlock Time</span>
+          <input class="field-input" data-unlock-time type="datetime-local" step="60" />
         </label>
       </div>
       <div class="actions" style="gap: 10px; flex-wrap: wrap;">
-        <button type="button" class="btn" data-unlock-now>Set to now + 60s</button>
         <button type="button" class="btn btn--primary" data-unlock-submit>Unlock</button>
       </div>
     `;
@@ -194,24 +188,20 @@ export class LockActionToasts {
     `;
   }
 
-  async _setNowPlus() {
-    try {
-      const provider = window.contractManager.getReadContract()?.provider || window.contractManager.getProvider?.();
-      const block = await provider.getBlock('latest');
-      const unlockTime = Number(block.timestamp) + 60;
-      this.unlockTimeInput.value = String(unlockTime);
-    } catch (err) {
-      const msg = normalizeErrorMessage(extractErrorMessage(err, 'Failed to fetch chain time'));
-      window.toastManager?.error(msg, { title: 'Time lookup failed' });
-    }
-  }
-
   async _submitUnlock() {
     try {
-      const lockId = Number(this.lockIdInput?.value || 0);
-      const unlockTime = Number(this.unlockTimeInput?.value || 0);
+      const lockId = Number(this._activeLockId);
       if (!Number.isFinite(lockId) || lockId < 0) throw new Error('Invalid lock ID');
+
+      const chainNow = await this._getChainTimestamp();
+      const minUnlockTime = chainNow + UNLOCK_TIME_BUFFER_SECONDS;
+      let unlockTime = this._parseUnlockInputToSeconds();
       if (!Number.isFinite(unlockTime) || unlockTime <= 0) throw new Error('Invalid unlock time');
+      if (unlockTime < minUnlockTime) {
+        unlockTime = minUnlockTime;
+        this._setUnlockInputMin(unlockTime);
+        this._setUnlockInputValue(this._getLocalDateTimeString(new Date(unlockTime * 1000)));
+      }
 
       const loadingId = window.toastManager?.loading('Submitting unlock...', { delayMs: 0 });
       const tx = await window.contractManager.unlock({ lockId, unlockTime });
@@ -221,12 +211,62 @@ export class LockActionToasts {
         title: 'Unlocked',
         message: formatTxMessage(receipt.transactionHash, 'Unlock confirmed.'),
         allowHtml: true,
-        timeoutMs: 0,
+        timeoutMs: 5000,
       });
+      if (this._unlockFormToastId) {
+        window.toastManager?.dismiss?.(this._unlockFormToastId);
+        this._unlockFormToastId = null;
+      }
+      window.overviewTab?.refreshLocks?.();
     } catch (err) {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Unlock failed'));
       window.toastManager?.error(msg, { title: 'Unlock failed' });
     }
+  }
+
+  _setUnlockInputMin(minSeconds = Math.floor(Date.now() / 1000) + UNLOCK_TIME_BUFFER_SECONDS) {
+    if (!this.unlockTimeInput) return;
+    this.unlockTimeInput.min = this._getLocalDateTimeString(new Date(minSeconds * 1000));
+  }
+
+  _enforceUnlockTimeMin() {
+    if (!this.unlockTimeInput || !this.unlockTimeInput.value) return;
+    const selected = this._parseUnlockInputToSeconds();
+    if (!Number.isFinite(selected)) return;
+    const minSeconds = Math.floor(Date.now() / 1000) + UNLOCK_TIME_BUFFER_SECONDS;
+    this._setUnlockInputMin(minSeconds);
+    if (selected < minSeconds) {
+      this._setUnlockInputValue(this._getLocalDateTimeString(new Date(minSeconds * 1000)));
+    }
+  }
+
+  _parseUnlockInputToSeconds() {
+    if (!this.unlockTimeInput?.value) return 0;
+    const parsed = new Date(this.unlockTimeInput.value);
+    const ms = parsed?.getTime?.();
+    if (!Number.isFinite(ms)) return 0;
+    return Math.floor(ms / 1000);
+  }
+
+  _setUnlockInputValue(value) {
+    if (this.unlockTimeInput) {
+      this.unlockTimeInput.value = value;
+    }
+  }
+
+  _getLocalDateTimeString(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+
+  async _getChainTimestamp() {
+    const provider = window.contractManager.getReadContract()?.provider || window.contractManager.getProvider?.();
+    const block = await provider.getBlock('latest');
+    return Number(block.timestamp);
   }
 
   async _loadWithdrawLock() {
