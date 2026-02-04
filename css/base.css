@@ -403,6 +403,10 @@ textarea:focus-visible {
   font-size: var(--font-size-sm);
 }
 
+.lock-filter-option.hidden {
+  display: none;
+}
+
 .lock-filter-field {
   display: grid;
   gap: 6px;

@@ -38,9 +38,12 @@ export class OverviewTab {
             <span class="field-label">Filters</span>
             <div class="lock-filter-options">
               <label class="lock-filter-option" data-disabled-reason="">
+                <input type="checkbox" data-filter-mine-or-withdraw /> My locks
+              </label>
+              <label class="lock-filter-option hidden" data-disabled-reason="">
                 <input type="checkbox" data-filter-mine /> My locks
               </label>
-              <label class="lock-filter-option" data-disabled-reason="">
+              <label class="lock-filter-option hidden" data-disabled-reason="">
                 <input type="checkbox" data-filter-withdraw /> Withdraw address = me
               </label>
             </div>
@@ -99,6 +102,7 @@ export class OverviewTab {
     this.refreshBtn = this.panel.querySelector('[data-overview-refresh]');
     this.filterMine = this.panel.querySelector('[data-filter-mine]');
     this.filterWithdraw = this.panel.querySelector('[data-filter-withdraw]');
+    this.filterMineOrWithdraw = this.panel.querySelector('[data-filter-mine-or-withdraw]');
     this.filterToken = this.panel.querySelector('[data-filter-token]');
     this.filterTokenInput = this.panel.querySelector('[data-filter-token-input]');
     this.filterTokenAdd = this.panel.querySelector('[data-filter-token-add]');
@@ -109,6 +113,7 @@ export class OverviewTab {
     this.refreshBtn?.addEventListener('click', () => this.refreshLocks());
     this.filterMine?.addEventListener('change', () => this._resetAndRender());
     this.filterWithdraw?.addEventListener('change', () => this._resetAndRender());
+    this.filterMineOrWithdraw?.addEventListener('change', () => this._handleMineOrWithdrawToggle());
     this.filterToken?.addEventListener('change', () => this._resetAndRender());
     this.filterTokenAdd?.addEventListener('click', () => this._addTokenFilter());
     this.pageSizeSelect?.addEventListener('change', () => this._resetAndRender());
@@ -245,12 +250,12 @@ export class OverviewTab {
       rows = rows.filter((l) => l.lock.token.toLowerCase() === filterToken);
     }
 
-    if (onlyMine && me) {
-      rows = rows.filter((l) => l.lock.creator.toLowerCase() === me);
-    }
-
-    if (onlyWithdraw && me) {
-      rows = rows.filter((l) => l.lock.withdrawAddress.toLowerCase() === me);
+    if (me && (onlyMine || onlyWithdraw)) {
+      rows = rows.filter((l) => {
+        const isCreator = l.lock.creator.toLowerCase() === me;
+        const isWithdraw = l.lock.withdrawAddress.toLowerCase() === me;
+        return (onlyMine && isCreator) || (onlyWithdraw && isWithdraw);
+      });
     }
 
     rows.sort((a, b) => {
@@ -581,5 +586,18 @@ export class OverviewTab {
       this.filterWithdraw.title = disabled ? reason : '';
       this.filterWithdraw.closest('[data-disabled-reason]')?.setAttribute('data-disabled-reason', disabled ? reason : '');
     }
+    if (this.filterMineOrWithdraw) {
+      this.filterMineOrWithdraw.disabled = disabled;
+      this.filterMineOrWithdraw.title = disabled ? reason : '';
+      this.filterMineOrWithdraw.closest('[data-disabled-reason]')?.setAttribute('data-disabled-reason', disabled ? reason : '');
+    }
+  }
+
+  _handleMineOrWithdrawToggle() {
+    if (!this.filterMineOrWithdraw) return;
+    const nextChecked = this.filterMineOrWithdraw.checked;
+    if (this.filterMine) this.filterMine.checked = nextChecked;
+    if (this.filterWithdraw) this.filterWithdraw.checked = nextChecked;
+    this._resetAndRender();
   }
 }
