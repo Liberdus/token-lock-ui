@@ -57,7 +57,6 @@ export class LockTab {
         </div>
 
         <div class="actions" style="gap: 10px; flex-wrap: wrap;">
-          <button type="button" class="btn" data-lock-approve>Approve</button>
           <button type="button" class="btn btn--primary" data-lock-submit>Lock</button>
         </div>
 
@@ -80,13 +79,11 @@ export class LockTab {
     this.durationInput = this.panel.querySelector('[data-lock-duration]');
     this.ratePctInput = this.panel.querySelector('[data-lock-rate-pct]');
     this.withdrawInput = this.panel.querySelector('[data-lock-withdraw]');
-    this.approveBtn = this.panel.querySelector('[data-lock-approve]');
     this.submitBtn = this.panel.querySelector('[data-lock-submit]');
 
     this.durationInput?.addEventListener('input', () => this._updateRate());
     this.tokenInput?.addEventListener('input', () => this._scheduleTokenMetaLoad());
     this.tokenInput?.addEventListener('blur', () => this._loadTokenMeta());
-    this.approveBtn?.addEventListener('click', () => this._approve());
     this.submitBtn?.addEventListener('click', () => this._submit());
   }
 
@@ -142,40 +139,6 @@ export class LockTab {
     }
   }
 
-  async _approve() {
-    try {
-      const token = (this.tokenInput?.value || '').trim();
-      const amount = Number(this.amountInput?.value || 0);
-      if (!token) throw new Error('Token address required');
-      if (!amount || amount <= 0) throw new Error('Amount must be > 0');
-      await this._ensureTokenMeta(token);
-
-      if (this._tokenMeta.decimals == null) throw new Error('Load token info first');
-      const parsed = window.ethers.utils.parseUnits(
-        amount.toString(),
-        this._tokenMeta.decimals
-      );
-
-      const loadingId = window.toastManager?.loading('Submitting approval...');
-      const tx = await window.contractManager.approveToken({
-        token,
-        spender: CONFIG.CONTRACT.ADDRESS,
-        amount: parsed,
-      });
-      const receipt = await tx.wait();
-      window.toastManager?.update(loadingId, {
-        type: 'success',
-        title: 'Approved',
-        message: formatTxMessage(receipt.transactionHash, 'Approval confirmed.'),
-        allowHtml: true,
-        timeoutMs: 6000,
-      });
-    } catch (err) {
-      const msg = normalizeErrorMessage(extractErrorMessage(err, 'Approval failed'));
-      window.toastManager?.error(msg, { title: 'Approval failed' });
-    }
-  }
-
   async _submit() {
     try {
       const token = (this.tokenInput?.value || '').trim();
@@ -199,25 +162,73 @@ export class LockTab {
         this._tokenMeta.decimals
       );
 
-      const loadingId = window.toastManager?.loading('Submitting lock...');
-      const tx = await window.contractManager.lock({
-        token,
-        amount: parsedAmount,
-        cliffDays: Math.floor(cliffDays),
-        ratePerDay: ratePerDay,
-        withdrawAddress: withdrawAddress || ZERO_ADDRESS,
-      });
-      const receipt = await tx.wait();
-      window.toastManager?.update(loadingId, {
-        type: 'success',
-        title: 'Lock created',
-        message: formatTxMessage(receipt.transactionHash, 'Lock confirmed.'),
-        allowHtml: true,
-        timeoutMs: 6000,
-      });
+      const owner = window.walletManager?.getAddress?.();
+      if (!owner) throw new Error('Wallet not connected');
+
+      let flowToastId = null;
+      let lockToastId = null;
+
+      try {
+        flowToastId = window.toastManager?.loading('Checking approval...', { delayMs: 0 });
+        const allowance = await window.contractManager.getTokenAllowance(
+          token,
+          owner,
+          CONFIG.CONTRACT.ADDRESS
+        );
+        const needsApproval = !allowance || allowance.lt(parsedAmount);
+
+        if (needsApproval) {
+          window.toastManager?.update(flowToastId, {
+            type: 'loading',
+            title: 'Approval',
+            message: 'Submitting approval...',
+          });
+          const approveTx = await window.contractManager.approveToken({
+            token,
+            spender: CONFIG.CONTRACT.ADDRESS,
+            amount: parsedAmount,
+          });
+          const approveReceipt = await approveTx.wait();
+          window.toastManager?.update(flowToastId, {
+            type: 'success',
+            title: 'Approved',
+            message: formatTxMessage(approveReceipt.transactionHash, 'Approval confirmed.'),
+            allowHtml: true,
+            timeoutMs: 5000,
+          });
+          await this._sleep(1200);
+        } else {
+          window.toastManager?.dismiss?.(flowToastId);
+          flowToastId = null;
+        }
+
+        lockToastId = window.toastManager?.loading('Submitting lock...', { delayMs: 0 });
+        const tx = await window.contractManager.lock({
+          token,
+          amount: parsedAmount,
+          cliffDays: Math.floor(cliffDays),
+          ratePerDay: ratePerDay,
+          withdrawAddress: withdrawAddress || ZERO_ADDRESS,
+        });
+        const receipt = await tx.wait();
+        window.toastManager?.update(lockToastId, {
+          type: 'success',
+          title: 'Lock created',
+          message: formatTxMessage(receipt.transactionHash, 'Lock confirmed.'),
+          allowHtml: true,
+          timeoutMs: 5000,
+        });
+
+        // Refresh overview tab data
+        window.overviewTab?.refreshLocks?.();
+      } catch (innerErr) {
+        if (flowToastId) window.toastManager?.dismiss?.(flowToastId);
+        if (lockToastId) window.toastManager?.dismiss?.(lockToastId);
+        throw innerErr;
+      }
     } catch (err) {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Lock failed'));
-      window.toastManager?.error(msg, { title: 'Lock failed' });
+      window.toastManager?.error(msg, { title: 'Lock failed', timeoutMs: 0 });
     }
   }
 
@@ -239,6 +250,10 @@ export class LockTab {
     } catch {
       return '';
     }
+  }
+
+  _sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   _clearTokenMeta() {

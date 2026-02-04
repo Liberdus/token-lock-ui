@@ -122,7 +122,9 @@ export class ToastManager {
     if (type || className) {
       const extraClass = className ? ` ${className}` : '';
       const nextType = type || el.className.split(' ').find((c) => c !== 'notification' && c !== className) || 'info';
-      el.className = `notification ${nextType}${extraClass}`;
+      // Preserve the 'show' class to maintain visibility
+      const hasShow = el.classList.contains('show');
+      el.className = `notification ${nextType}${extraClass}${hasShow ? ' show' : ''}`;
       el.setAttribute('role', type === 'error' ? 'alert' : 'status');
       // Update icon
       const iconMap = {

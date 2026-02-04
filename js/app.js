@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.toastManager = toastManager;
   window.tabBar = tabBar;
   window.lockActionToasts = lockActionToasts;
+  window.overviewTab = overviewTab;
 
   toastManager.load();
   walletManager.load();

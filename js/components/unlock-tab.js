@@ -167,7 +167,7 @@ export class LockActionToasts {
       if (!Number.isFinite(lockId) || lockId < 0) throw new Error('Invalid lock ID');
       if (!Number.isFinite(unlockTime) || unlockTime <= 0) throw new Error('Invalid unlock time');
 
-      const loadingId = window.toastManager?.loading('Submitting unlock...');
+      const loadingId = window.toastManager?.loading('Submitting unlock...', { delayMs: 0 });
       const tx = await window.contractManager.unlock({ lockId, unlockTime });
       const receipt = await tx.wait();
       window.toastManager?.update(loadingId, {
@@ -175,7 +175,7 @@ export class LockActionToasts {
         title: 'Unlocked',
         message: formatTxMessage(receipt.transactionHash, 'Unlock confirmed.'),
         allowHtml: true,
-        timeoutMs: 6000,
+        timeoutMs: 0,
       });
     } catch (err) {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Unlock failed'));
@@ -249,7 +249,7 @@ export class LockActionToasts {
         amount = window.ethers.BigNumber.from(0);
       }
 
-      const loadingId = window.toastManager?.loading('Submitting withdrawal...');
+      const loadingId = window.toastManager?.loading('Submitting withdrawal...', { delayMs: 0 });
       const tx = await window.contractManager.withdraw({
         lockId,
         amount,
@@ -262,7 +262,7 @@ export class LockActionToasts {
         title: 'Withdrawn',
         message: formatTxMessage(receipt.transactionHash, 'Withdrawal confirmed.'),
         allowHtml: true,
-        timeoutMs: 6000,
+        timeoutMs: 0,
       });
     } catch (err) {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Withdraw failed'));
