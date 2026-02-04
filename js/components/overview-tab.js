@@ -336,6 +336,7 @@ export class OverviewTab {
     const vestingDurationLabel = formatMonthsDays(vestingDays);
 
     const withdrawShort = `${lock.withdrawAddress.slice(0, 6)}…${lock.withdrawAddress.slice(-4)}`;
+    const creatorShort = `${lock.creator.slice(0, 6)}…${lock.creator.slice(-4)}`;
     const me = (window.walletManager?.getAddress?.() || '').toLowerCase();
     const unlockAllowed = me && lock.creator.toLowerCase() === me && !lock.unlocked;
     const withdrawAddress = lock.withdrawAddress?.toLowerCase?.() || '';
@@ -450,7 +451,14 @@ export class OverviewTab {
             </div>
             <div class="lock-kv">
               <div class="field-label">Creator</div>
-              <div class="field-input">${lock.creator.slice(0, 6)}…${lock.creator.slice(-4)}</div>
+              <div class="field-input lock-address" title="${lock.creator}">
+                ${creatorShort}
+                <button type="button" class="btn btn--ghost btn--icon" data-copy="${lock.creator}" aria-label="Copy address">
+                  <svg class="icon icon-copy" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M8 8a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V8zm-3 9V7a4 4 0 0 1 4-4h7" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
