@@ -477,13 +477,9 @@ export class OverviewTab {
     const me = this._getCurrentAddress();
     const isCreator = this._isCreator(lock, me);
     const isWithdrawer = this._isWithdrawer(lock, me);
-    const withdrawnRaw = lock.withdrawn?.toString?.() ?? lock.withdrawn ?? 0;
-    const withdrawnZero = window.ethers?.BigNumber?.from
-      ? window.ethers.BigNumber.from(withdrawnRaw).isZero()
-      : Number(withdrawnRaw || 0) === 0;
     const showUnlock = !!isCreator;
     const showWithdraw = !!isWithdrawer;
-    const showRetract = !!(isCreator && withdrawnZero);
+    const showRetract = !!isCreator;
     const detailsExpanded = this._expandedLockDetails.has(entry.id);
     const detailsArrow = detailsExpanded ? '▼' : '▶';
 
@@ -688,8 +684,12 @@ export class OverviewTab {
   _openRetractToast(lockId) {
     const id = Number(lockId);
     if (!Number.isFinite(id) || id < 0) return;
-    const me = (window.walletManager?.getAddress?.() || '').toLowerCase();
-    if (!me) return;
+    const lock = this._lockIndex.get(id);
+    const reason = this._getRetractUnavailableReason(lock);
+    if (reason) {
+      this._showActionUnavailable(reason);
+      return;
+    }
     window.lockActionToasts?.openRetractToast?.({ lockId: id });
   }
 
@@ -771,6 +771,14 @@ export class OverviewTab {
 
     if (available != null && this._isZeroAmount(available)) return 'No tokens are available to withdraw right now.';
 
+    return '';
+  }
+
+  _getRetractUnavailableReason(lock) {
+    if (!lock) return 'Lock not found.';
+    if (!this._isCreator(lock)) return 'Only the lock creator can retract.';
+    const withdrawnRaw = lock.withdrawn?.toString?.() ?? lock.withdrawn ?? 0;
+    if (!this._isZeroAmount(withdrawnRaw)) return 'Cannot retract after withdrawals have occurred.';
     return '';
   }
 
