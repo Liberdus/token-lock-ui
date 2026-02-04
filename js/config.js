@@ -21,6 +21,7 @@ export const CONFIG = {
   // Phase 3+
   CONTRACT: {
     // TokenLock contract
-    ADDRESS: '0x0Fa98EaEe23c7FD03042A3411114D6c748e9Edc1',
+    ADDRESS: '0x49c1b64fd69536619eAEd9D60f030fCc6bAF3bBD',
+    DEPLOYMENT_BLOCK: 33296506,
   },
 };

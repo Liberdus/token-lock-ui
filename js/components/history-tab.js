@@ -34,23 +34,32 @@ export class HistoryTab {
       </div>
 
       <div class="card">
-        <div class="form-grid" style="margin-bottom: 12px;">
-          <label class="field">
-            <span class="field-label">From block (optional)</span>
-            <input class="field-input" data-history-from type="number" min="0" step="1" placeholder="0" />
+        <div style="display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+          <label style="display:flex; gap:8px; align-items:center; font-size: var(--font-size-sm);">
+            <input type="checkbox" data-history-mine checked />
+            My completed locks
           </label>
-          <label class="field">
-            <span class="field-label">To block (optional)</span>
-            <input class="field-input" data-history-to type="number" min="0" step="1" placeholder="latest" />
-          </label>
-          <label class="field">
-            <span class="field-label">Creator filter (optional)</span>
-            <input class="field-input" data-history-creator placeholder="0x..." />
-          </label>
-          <label class="field">
-            <span class="field-label">Withdraw address filter (optional)</span>
-            <input class="field-input" data-history-withdraw placeholder="0x..." />
-          </label>
+          <details data-history-advanced>
+            <summary style="cursor:pointer; font-size: var(--font-size-sm); color: var(--secondary-text-color);">Advanced filters</summary>
+            <div class="form-grid" style="margin-top:12px;">
+              <label class="field">
+                <span class="field-label">From block</span>
+                <input class="field-input" data-history-from type="number" min="0" step="1" placeholder="0" />
+              </label>
+              <label class="field">
+                <span class="field-label">To block</span>
+                <input class="field-input" data-history-to type="number" min="0" step="1" placeholder="latest" />
+              </label>
+              <label class="field">
+                <span class="field-label">Creator filter</span>
+                <input class="field-input" data-history-creator placeholder="0x..." />
+              </label>
+              <label class="field">
+                <span class="field-label">Withdraw address filter</span>
+                <input class="field-input" data-history-withdraw placeholder="0x..." />
+              </label>
+            </div>
+          </details>
         </div>
 
         <div style="display:flex; gap:10px; align-items:center; margin-bottom:10px;">
@@ -70,11 +79,16 @@ export class HistoryTab {
     this.toInput = this.panel.querySelector('[data-history-to]');
     this.creatorInput = this.panel.querySelector('[data-history-creator]');
     this.withdrawInput = this.panel.querySelector('[data-history-withdraw]');
+    this.mineInput = this.panel.querySelector('[data-history-mine]');
     this.loadBtn = this.panel.querySelector('[data-history-load]');
     this.statusEl = this.panel.querySelector('[data-history-status]');
     this.listEl = this.panel.querySelector('[data-history-list]');
 
     this.loadBtn?.addEventListener('click', () => this._loadHistory());
+
+    if (this.fromInput && CONFIG?.CONTRACT?.DEPLOYMENT_BLOCK) {
+      this.fromInput.value = String(CONFIG.CONTRACT.DEPLOYMENT_BLOCK);
+    }
   }
 
   _setStatus(message) {
@@ -88,6 +102,8 @@ export class HistoryTab {
       const toBlock = toBlockRaw ? Number(toBlockRaw) : 'latest';
       const creatorFilter = (this.creatorInput?.value || '').trim().toLowerCase();
       const withdrawFilter = (this.withdrawInput?.value || '').trim().toLowerCase();
+      const mineOnly = !!this.mineInput?.checked;
+      const me = (window.walletManager?.getAddress?.() || '').toLowerCase();
 
       if (!Number.isFinite(fromBlock) || fromBlock < 0) {
         throw new Error('Invalid from block');
@@ -121,6 +137,9 @@ export class HistoryTab {
             const args = parsed.args;
             const creator = String(args.creator).toLowerCase();
             const withdrawAddress = String(args.withdrawAddress).toLowerCase();
+            if (mineOnly && me) {
+              if (creator !== me && withdrawAddress !== me) continue;
+            }
             if (creatorFilter && creator !== creatorFilter) continue;
             if (withdrawFilter && withdrawAddress !== withdrawFilter) continue;
             events.push({
