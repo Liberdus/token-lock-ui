@@ -154,6 +154,13 @@ button:disabled {
   opacity: 0.7;
 }
 
+.field-input[readonly] {
+  background: var(--hover-background);
+  color: var(--secondary-text-color);
+  cursor: default;
+  pointer-events: none;
+}
+
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,

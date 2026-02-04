@@ -22,17 +22,17 @@ export class LockTab {
 
       <div class="card">
         <div class="form-grid">
-          <label class="field">
+          <label class="field field--full">
             <span class="field-label">Token Address</span>
             <input class="field-input" data-lock-token placeholder="0x..." />
           </label>
           <label class="field">
-            <span class="field-label">Token Decimals</span>
-            <input class="field-input" data-lock-decimals value="18" readonly />
-          </label>
-          <label class="field">
             <span class="field-label">Token Symbol</span>
             <input class="field-input" data-lock-symbol value="" readonly />
+          </label>
+          <label class="field">
+            <span class="field-label">Token Decimals</span>
+            <input class="field-input" data-lock-decimals value="" readonly />
           </label>
           <label class="field">
             <span class="field-label">Amount (tokens)</span>
@@ -47,10 +47,6 @@ export class LockTab {
             <input class="field-input" data-lock-duration type="number" min="1" step="1" value="365" />
           </label>
           <label class="field">
-            <span class="field-label">Rate Per Day (scaled)</span>
-            <input class="field-input" data-lock-rate value="" readonly />
-          </label>
-          <label class="field">
             <span class="field-label">Daily %</span>
             <input class="field-input" data-lock-rate-pct value="" readonly />
           </label>
@@ -61,7 +57,6 @@ export class LockTab {
         </div>
 
         <div class="actions" style="gap: 10px; flex-wrap: wrap;">
-          <button type="button" class="btn" data-lock-fetch>Load Token Info</button>
           <button type="button" class="btn" data-lock-approve>Approve</button>
           <button type="button" class="btn btn--primary" data-lock-submit>Lock</button>
         </div>
@@ -83,15 +78,14 @@ export class LockTab {
     this.amountInput = this.panel.querySelector('[data-lock-amount]');
     this.cliffInput = this.panel.querySelector('[data-lock-cliff]');
     this.durationInput = this.panel.querySelector('[data-lock-duration]');
-    this.rateInput = this.panel.querySelector('[data-lock-rate]');
     this.ratePctInput = this.panel.querySelector('[data-lock-rate-pct]');
     this.withdrawInput = this.panel.querySelector('[data-lock-withdraw]');
-    this.fetchBtn = this.panel.querySelector('[data-lock-fetch]');
     this.approveBtn = this.panel.querySelector('[data-lock-approve]');
     this.submitBtn = this.panel.querySelector('[data-lock-submit]');
 
     this.durationInput?.addEventListener('input', () => this._updateRate());
-    this.fetchBtn?.addEventListener('click', () => this._loadTokenMeta());
+    this.tokenInput?.addEventListener('input', () => this._scheduleTokenMetaLoad());
+    this.tokenInput?.addEventListener('blur', () => this._loadTokenMeta());
     this.approveBtn?.addEventListener('click', () => this._approve());
     this.submitBtn?.addEventListener('click', () => this._submit());
   }
@@ -105,21 +99,44 @@ export class LockTab {
     }
     const rate = Math.floor(RATE_SCALE / duration);
     const pct = (rate / RATE_SCALE) * 100;
-    this.rateInput.value = String(rate);
     this.ratePctInput.value = `${pct.toFixed(6)}%`;
+  }
+
+  _scheduleTokenMetaLoad() {
+    if (this._tokenMetaTimer) {
+      clearTimeout(this._tokenMetaTimer);
+    }
+    const token = (this.tokenInput?.value || '').trim();
+    const normalized = this._normalizeAddress(token);
+    if (!normalized) {
+      this._clearTokenMeta();
+      return;
+    }
+    this._tokenMetaTimer = setTimeout(() => {
+      this._tokenMetaTimer = null;
+      this._loadTokenMeta();
+    }, 350);
   }
 
   async _loadTokenMeta() {
     const token = (this.tokenInput?.value || '').trim();
     if (!token) return;
+    const normalized = this._normalizeAddress(token);
+    if (!normalized) {
+      this._clearTokenMeta();
+      return;
+    }
+    if (this._lastTokenMeta === normalized) return;
     try {
-      const meta = await window.contractManager.getTokenMetadata(token);
+      const meta = await window.contractManager.getTokenMetadata(normalized);
       if (meta) {
-        this._tokenMeta = meta;
-        this.decimalsInput.value = String(meta.decimals ?? 18);
+        this._tokenMeta = { ...meta };
+        this.decimalsInput.value = meta.decimals == null ? '' : String(meta.decimals);
         this.symbolInput.value = meta.symbol || '';
+        this._lastTokenMeta = normalized;
       }
     } catch (err) {
+      this._clearTokenMeta();
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Failed to load token metadata'));
       window.toastManager?.error(msg, { title: 'Token lookup failed' });
     }
@@ -133,9 +150,10 @@ export class LockTab {
       if (!amount || amount <= 0) throw new Error('Amount must be > 0');
       await this._ensureTokenMeta(token);
 
+      if (this._tokenMeta.decimals == null) throw new Error('Load token info first');
       const parsed = window.ethers.utils.parseUnits(
         amount.toString(),
-        this._tokenMeta.decimals || 18
+        this._tokenMeta.decimals
       );
 
       const loadingId = window.toastManager?.loading('Submitting approval...');
@@ -163,7 +181,10 @@ export class LockTab {
       const token = (this.tokenInput?.value || '').trim();
       const amount = Number(this.amountInput?.value || 0);
       const cliffDays = Number(this.cliffInput?.value || 0);
-      const ratePerDay = this.rateInput?.value ? Number(this.rateInput.value) : 0;
+      const durationDays = Number(this.durationInput?.value || 0);
+      const ratePerDay = Number.isFinite(durationDays) && durationDays > 0
+        ? Math.floor(RATE_SCALE / durationDays)
+        : 0;
       const withdrawAddress = (this.withdrawInput?.value || '').trim();
 
       if (!token) throw new Error('Token address required');
@@ -172,9 +193,10 @@ export class LockTab {
       if (!ratePerDay || ratePerDay <= 0) throw new Error('Invalid rate');
 
       await this._ensureTokenMeta(token);
+      if (this._tokenMeta.decimals == null) throw new Error('Load token info first');
       const parsedAmount = window.ethers.utils.parseUnits(
         amount.toString(),
-        this._tokenMeta.decimals || 18
+        this._tokenMeta.decimals
       );
 
       const loadingId = window.toastManager?.loading('Submitting lock...');
@@ -201,10 +223,28 @@ export class LockTab {
 
   async _ensureTokenMeta(token) {
     if (!this._tokenMeta || this._tokenMeta._token !== token) {
-      const meta = await window.contractManager.getTokenMetadata(token);
-      this._tokenMeta = { ...(meta || { symbol: '', decimals: 18 }), _token: token };
-      this.decimalsInput.value = String(this._tokenMeta.decimals ?? 18);
+      const normalized = this._normalizeAddress(token);
+      const meta = await window.contractManager.getTokenMetadata(normalized || token);
+      this._tokenMeta = { ...(meta || { symbol: '', decimals: null }), _token: normalized || token };
+      this.decimalsInput.value = this._tokenMeta.decimals == null ? '' : String(this._tokenMeta.decimals);
       this.symbolInput.value = this._tokenMeta.symbol || '';
+      this._lastTokenMeta = normalized || token;
     }
+  }
+
+  _normalizeAddress(value) {
+    if (!value) return '';
+    try {
+      return window.ethers.utils.getAddress(value);
+    } catch {
+      return '';
+    }
+  }
+
+  _clearTokenMeta() {
+    this._tokenMeta = { symbol: '', decimals: null };
+    this._lastTokenMeta = '';
+    if (this.decimalsInput) this.decimalsInput.value = '';
+    if (this.symbolInput) this.symbolInput.value = '';
   }
 }
