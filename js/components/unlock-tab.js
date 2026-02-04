@@ -136,12 +136,13 @@ export class LockActionToasts {
     if (!root) return;
 
     this._retractFormToastId = id;
-    this.retractIdInput = root.querySelector('[data-retract-id]');
+    this._activeRetractLockId = Number.isFinite(Number(lockId)) ? Number(lockId) : null;
+    this.retractIdDisplay = root.querySelector('[data-retract-id]');
     this.retractToInput = root.querySelector('[data-retract-to]');
     this.retractSubmitBtn = root.querySelector('[data-retract-submit]');
 
-    if (lockId != null) {
-      this.retractIdInput.value = String(lockId);
+    if (this.retractIdDisplay) {
+      this.retractIdDisplay.textContent = this._activeRetractLockId != null ? `#${this._activeRetractLockId}` : '—';
     }
 
     this.retractSubmitBtn?.addEventListener('click', () => this._submitRetract());
@@ -240,10 +241,10 @@ export class LockActionToasts {
   _renderRetractFormHtml() {
     return `
       <div class="form-grid">
-        <label class="field">
+        <div class="field">
           <span class="field-label">Lock ID</span>
-          <input class="field-input" data-retract-id type="number" min="0" step="1" placeholder="0" />
-        </label>
+          <div class="field-readonly" data-retract-id>—</div>
+        </div>
         <label class="field">
           <span class="field-label">Retract To (optional)</span>
           <input class="field-input" data-retract-to placeholder="Defaults to creator" />
@@ -478,7 +479,7 @@ export class LockActionToasts {
 
   async _submitRetract() {
     try {
-      const lockId = Number(this.retractIdInput?.value || 0);
+      const lockId = Number(this._activeRetractLockId);
       if (!Number.isFinite(lockId) || lockId < 0) throw new Error('Invalid lock ID');
       const to = (this.retractToInput?.value || '').trim();
 
