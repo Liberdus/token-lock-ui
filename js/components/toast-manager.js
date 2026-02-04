@@ -92,7 +92,7 @@ export class ToastManager {
   }
 
   loading(message, { title = 'Loading', id, delayMs = 200, allowHtml = false } = {}) {
-    return this.show({ id, title, message, type: 'loading', timeoutMs: 0, dismissible: false, delayMs, allowHtml });
+    return this.show({ id, title, message, type: 'loading', timeoutMs: 0, dismissible: true, delayMs, allowHtml });
   }
 
   success(message, { title = 'Done', timeoutMs = 2500, id, allowHtml = false } = {}) {

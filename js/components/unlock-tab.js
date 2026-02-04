@@ -108,6 +108,7 @@ export class LockActionToasts {
     const root = toastEl?.querySelector?.('.notification-message');
     if (!root) return;
 
+    this._retractFormToastId = id;
     this.retractIdInput = root.querySelector('[data-retract-id]');
     this.retractToInput = root.querySelector('[data-retract-to]');
     this.retractSubmitBtn = root.querySelector('[data-retract-submit]');
@@ -373,8 +374,12 @@ export class LockActionToasts {
         title: 'Retracted',
         message: formatTxMessage(receipt.transactionHash, 'Retract confirmed.'),
         allowHtml: true,
-        timeoutMs: 0,
+        timeoutMs: 5000,
       });
+      if (this._retractFormToastId) {
+        window.toastManager?.dismiss?.(this._retractFormToastId);
+        this._retractFormToastId = null;
+      }
       window.overviewTab?.refreshLocks?.();
     } catch (err) {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Retract failed'));

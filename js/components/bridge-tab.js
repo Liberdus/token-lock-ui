@@ -322,7 +322,7 @@ export class BridgeTab {
         type: 'loading',
         title: 'Transaction sent',
         message: 'Waiting for confirmation…',
-        dismissible: false,
+        dismissible: true,
         timeoutMs: 0,
       });
 
@@ -387,4 +387,3 @@ export class BridgeTab {
     return raw;
   }
 }
-
