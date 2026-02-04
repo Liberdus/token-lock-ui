@@ -88,23 +88,3 @@ export function normalizeErrorMessage(message) {
   
   return message;
 }
-
-/**
- * Detects if error is "Signature already submitted" and returns user-friendly message
- * @param {string} errorMessage - Error message to check
- * @returns {{title: string, message: string}} Object with title and message
- */
-export function formatSignatureError(errorMessage) {
-  const lowerMessage = errorMessage.toLowerCase();
-  if (lowerMessage.includes('signature already submitted') || 
-      lowerMessage.includes('already signed')) {
-    return {
-      title: 'Already signed',
-      message: 'You have already signed this proposal.',
-    };
-  }
-  return {
-    title: 'Sign failed',
-    message: errorMessage,
-  };
-}

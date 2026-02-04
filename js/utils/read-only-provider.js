@@ -165,9 +165,3 @@ export async function getReadOnlyProvider() {
 export function peekReadOnlyProvider() {
   return providerInstance;
 }
-
-export function resetReadOnlyProvider() {
-  providerInstance = null;
-  providerPromise = null;
-}
-
