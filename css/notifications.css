@@ -79,6 +79,10 @@
   width: 100%;
 }
 
+.notification.notification--form .field-readonly {
+  width: 100%;
+}
+
 .notification.notification--form .form-grid {
   margin-top: 0;
 }

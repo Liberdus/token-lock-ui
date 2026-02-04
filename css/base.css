@@ -856,6 +856,14 @@ textarea:focus-visible {
   padding: 10px 12px;
 }
 
+.field-readonly {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  color: var(--text-color);
+  padding: 0 2px;
+}
+
 .actions {
   margin-top: 14px;
   display: flex;

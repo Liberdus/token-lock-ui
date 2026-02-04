@@ -28,11 +28,11 @@ export class LockTab {
           </label>
           <label class="field">
             <span class="field-label">Token Symbol</span>
-            <input class="field-input" data-lock-symbol value="" readonly />
+            <div class="field-readonly" data-lock-symbol>—</div>
           </label>
           <label class="field">
             <span class="field-label">Token Decimals</span>
-            <input class="field-input" data-lock-decimals value="" readonly />
+            <div class="field-readonly" data-lock-decimals>—</div>
           </label>
           <label class="field">
             <span class="field-label">Amount (tokens)</span>
@@ -48,7 +48,7 @@ export class LockTab {
           </label>
           <label class="field">
             <span class="field-label">Daily %</span>
-            <input class="field-input" data-lock-rate-pct value="" readonly />
+            <div class="field-readonly" data-lock-rate-pct>—</div>
           </label>
           <label class="field field--full">
             <span class="field-label">Withdraw Address (optional)</span>
@@ -90,12 +90,12 @@ export class LockTab {
   _updateRate() {
     const duration = Number(this.durationInput?.value || 0);
     if (!Number.isFinite(duration) || duration <= 0) {
-      if (this.ratePctInput) this.ratePctInput.value = '';
+      if (this.ratePctInput) this.ratePctInput.textContent = '—';
       return;
     }
     const rate = Math.floor(RATE_SCALE / duration);
     const pct = (rate / RATE_SCALE) * 100;
-    this.ratePctInput.value = `${pct.toFixed(6)}%`;
+    this.ratePctInput.textContent = `${pct.toFixed(6)}%`;
   }
 
   _scheduleTokenMetaLoad() {
@@ -127,8 +127,8 @@ export class LockTab {
       const meta = await window.contractManager.getTokenMetadata(normalized);
       if (meta) {
         this._tokenMeta = { ...meta };
-        this.decimalsInput.value = meta.decimals == null ? '' : String(meta.decimals);
-        this.symbolInput.value = meta.symbol || '';
+        this.decimalsInput.textContent = meta.decimals == null ? '—' : String(meta.decimals);
+        this.symbolInput.textContent = meta.symbol || '—';
         this._lastTokenMeta = normalized;
       }
     } catch (err) {
@@ -236,8 +236,8 @@ export class LockTab {
       const normalized = this._normalizeAddress(token);
       const meta = await window.contractManager.getTokenMetadata(normalized || token);
       this._tokenMeta = { ...(meta || { symbol: '', decimals: null }), _token: normalized || token };
-      this.decimalsInput.value = this._tokenMeta.decimals == null ? '' : String(this._tokenMeta.decimals);
-      this.symbolInput.value = this._tokenMeta.symbol || '';
+      this.decimalsInput.textContent = this._tokenMeta.decimals == null ? '—' : String(this._tokenMeta.decimals);
+      this.symbolInput.textContent = this._tokenMeta.symbol || '—';
       this._lastTokenMeta = normalized || token;
     }
   }
@@ -258,7 +258,7 @@ export class LockTab {
   _clearTokenMeta() {
     this._tokenMeta = { symbol: '', decimals: null };
     this._lastTokenMeta = '';
-    if (this.decimalsInput) this.decimalsInput.value = '';
-    if (this.symbolInput) this.symbolInput.value = '';
+    if (this.decimalsInput) this.decimalsInput.textContent = '—';
+    if (this.symbolInput) this.symbolInput.textContent = '—';
   }
 }

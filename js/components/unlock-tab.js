@@ -264,11 +264,11 @@ export class LockActionToasts {
         </label>
         <label class="field">
           <span class="field-label">Token Symbol</span>
-          <input class="field-input" data-lock-symbol value="" readonly />
+          <div class="field-readonly" data-lock-symbol>—</div>
         </label>
         <label class="field">
           <span class="field-label">Token Decimals</span>
-          <input class="field-input" data-lock-decimals value="" readonly />
+          <div class="field-readonly" data-lock-decimals>—</div>
         </label>
         <label class="field">
           <span class="field-label">Amount (tokens)</span>
@@ -284,7 +284,7 @@ export class LockActionToasts {
         </label>
         <label class="field">
           <span class="field-label">Daily %</span>
-          <input class="field-input" data-lock-rate-pct value="" readonly />
+          <div class="field-readonly" data-lock-rate-pct>—</div>
         </label>
         <label class="field field--full">
           <span class="field-label">Withdraw Address (optional)</span>
@@ -509,12 +509,12 @@ export class LockActionToasts {
   _updateLockRate() {
     const duration = Number(this.lockDurationInput?.value || 0);
     if (!Number.isFinite(duration) || duration <= 0) {
-      if (this.lockRatePctInput) this.lockRatePctInput.value = '';
+      if (this.lockRatePctInput) this.lockRatePctInput.textContent = '—';
       return;
     }
     const rate = Math.floor(RATE_SCALE / duration);
     const pct = (rate / RATE_SCALE) * 100;
-    this.lockRatePctInput.value = `${pct.toFixed(6)}%`;
+    this.lockRatePctInput.textContent = `${pct.toFixed(6)}%`;
   }
 
   _scheduleLockTokenMetaLoad() {
@@ -545,8 +545,8 @@ export class LockActionToasts {
     try {
       const meta = await window.contractManager.getTokenMetadata(normalized);
       this._lockFormTokenMeta = { ...(meta || { symbol: '', decimals: null }), _token: normalized };
-      this.lockDecimalsInput.value = meta?.decimals == null ? '' : String(meta.decimals);
-      this.lockSymbolInput.value = meta?.symbol || '';
+      this.lockDecimalsInput.textContent = meta?.decimals == null ? '—' : String(meta.decimals);
+      this.lockSymbolInput.textContent = meta?.symbol || '—';
     } catch (err) {
       this._clearLockTokenMeta();
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Failed to load token metadata'));
@@ -651,18 +651,18 @@ export class LockActionToasts {
     if (!this._lockFormTokenMeta || this._lockFormTokenMeta._token !== token) {
       const meta = await window.contractManager.getTokenMetadata(token);
       this._lockFormTokenMeta = { ...(meta || { symbol: '', decimals: null }), _token: token };
-      this.lockDecimalsInput.value = this._lockFormTokenMeta.decimals == null
-        ? ''
+      this.lockDecimalsInput.textContent = this._lockFormTokenMeta.decimals == null
+        ? '—'
         : String(this._lockFormTokenMeta.decimals);
-      this.lockSymbolInput.value = this._lockFormTokenMeta.symbol || '';
+      this.lockSymbolInput.textContent = this._lockFormTokenMeta.symbol || '—';
     }
     return this._lockFormTokenMeta;
   }
 
   _clearLockTokenMeta() {
     this._lockFormTokenMeta = { symbol: '', decimals: null, _token: '' };
-    if (this.lockDecimalsInput) this.lockDecimalsInput.value = '';
-    if (this.lockSymbolInput) this.lockSymbolInput.value = '';
+    if (this.lockDecimalsInput) this.lockDecimalsInput.textContent = '—';
+    if (this.lockSymbolInput) this.lockSymbolInput.textContent = '—';
   }
 
   _normalizeAddress(value) {
