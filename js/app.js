@@ -5,6 +5,7 @@ import { OverviewTab } from './components/overview-tab.js';
 import { LockTab } from './components/lock-tab.js';
 import { LockActionToasts } from './components/unlock-tab.js';
 import { ParametersTab } from './components/parameters-tab.js';
+import { HistoryTab } from './components/history-tab.js';
 import { ToastManager } from './components/toast-manager.js';
 import { WalletManager } from './wallet/wallet-manager.js';
 import { NetworkManager } from './wallet/network-manager.js';
@@ -18,6 +19,7 @@ const overviewTab = new OverviewTab();
 const lockTab = new LockTab();
 const lockActionToasts = new LockActionToasts();
 const parametersTab = new ParametersTab();
+const historyTab = new HistoryTab();
 const toastManager = new ToastManager();
 const walletManager = new WalletManager();
 const networkManager = new NetworkManager({ walletManager });
@@ -43,6 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.tabBar = tabBar;
   window.lockActionToasts = lockActionToasts;
   window.overviewTab = overviewTab;
+  window.historyTab = historyTab;
 
   toastManager.load();
   walletManager.load();
@@ -57,6 +60,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   lockTab.load();
   lockActionToasts.load();
   parametersTab.load();
+  historyTab.load();
 
   const clearBtn = document.getElementById('app-clear-cache');
   clearBtn?.addEventListener('click', () => {

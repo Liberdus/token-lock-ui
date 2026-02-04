@@ -91,6 +91,17 @@
             >
               Parameters
             </button>
+            <button
+              class="tab-button"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="panel-history"
+              data-tab="history"
+              tabindex="-1"
+            >
+              History
+            </button>
           </div>
 
           <div class="tab-panels">
@@ -113,6 +124,14 @@
               class="tab-panel"
               id="panel-parameters"
               data-panel="parameters"
+              role="tabpanel"
+              tabindex="0"
+              hidden
+            ></section>
+            <section
+              class="tab-panel"
+              id="panel-history"
+              data-panel="history"
               role="tabpanel"
               tabindex="0"
               hidden
