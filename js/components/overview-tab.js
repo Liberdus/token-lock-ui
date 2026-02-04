@@ -111,24 +111,46 @@ export class OverviewTab {
     this.loadMoreBtn = this.panel.querySelector('[data-overview-load-more]');
 
     this.refreshBtn?.addEventListener('click', () => this.refreshLocks());
-    this.filterMine?.addEventListener('change', () => this._resetAndRender());
-    this.filterWithdraw?.addEventListener('change', () => this._resetAndRender());
+    this.filterMine?.addEventListener('change', () => {
+      this._savePreferences();
+      this._resetAndRender();
+    });
+    this.filterWithdraw?.addEventListener('change', () => {
+      this._savePreferences();
+      this._resetAndRender();
+    });
     this.filterMineOrWithdraw?.addEventListener('change', () => this._handleMineOrWithdrawToggle());
     this.filterToken?.addEventListener('change', () => this._resetAndRender());
     this.filterTokenAdd?.addEventListener('click', () => this._addTokenFilter());
-    this.pageSizeSelect?.addEventListener('change', () => this._resetAndRender());
+    this.pageSizeSelect?.addEventListener('change', () => {
+      this._savePreferences();
+      this._resetAndRender();
+    });
     this.loadMoreBtn?.addEventListener('click', () => this._loadMore());
 
     this.panel.addEventListener('click', (e) => this._handleDisabledClick(e));
     this._updateFilterState();
+    if (this._restorePreferences()) {
+      this._resetAndRender();
+    }
 
     document.addEventListener('walletConnected', () => {
       this._updateFilterState();
-      this.renderLocks();
+      const restored = this._restorePreferences();
+      if (restored) {
+        this._resetAndRender();
+      } else {
+        this.renderLocks();
+      }
     });
     document.addEventListener('walletAccountChanged', () => {
       this._updateFilterState();
-      this.renderLocks();
+      const restored = this._restorePreferences();
+      if (restored) {
+        this._resetAndRender();
+      } else {
+        this.renderLocks();
+      }
     });
   }
 
@@ -651,6 +673,64 @@ export class OverviewTab {
     const nextChecked = this.filterMineOrWithdraw.checked;
     if (this.filterMine) this.filterMine.checked = nextChecked;
     if (this.filterWithdraw) this.filterWithdraw.checked = nextChecked;
+    this._savePreferences();
     this._resetAndRender();
+  }
+
+  _restorePreferences() {
+    const key = this._getPreferencesKey();
+    if (!key) return false;
+    try {
+      const raw = window.localStorage?.getItem(key);
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      let applied = false;
+
+      if (this.pageSizeSelect && parsed?.pageSize != null) {
+        const value = String(parsed.pageSize);
+        const option = this.pageSizeSelect.querySelector(`option[value="${value}"]`);
+        if (option) {
+          this.pageSizeSelect.value = value;
+          applied = true;
+        }
+      }
+
+      if (parsed?.mineOrWithdraw != null) {
+        const nextChecked = !!parsed.mineOrWithdraw;
+        if (this.filterMineOrWithdraw) this.filterMineOrWithdraw.checked = nextChecked;
+        if (this.filterMine) this.filterMine.checked = nextChecked;
+        if (this.filterWithdraw) this.filterWithdraw.checked = nextChecked;
+        applied = true;
+      }
+
+      return applied;
+    } catch {
+      return false;
+    }
+  }
+
+  _savePreferences() {
+    const key = this._getPreferencesKey();
+    if (!key) return;
+    try {
+      const mineOrWithdraw = this.filterMineOrWithdraw
+        ? this.filterMineOrWithdraw.checked
+        : !!(this.filterMine?.checked || this.filterWithdraw?.checked);
+      const payload = {
+        pageSize: this.pageSizeSelect?.value || '10',
+        mineOrWithdraw,
+      };
+      window.localStorage?.setItem(key, JSON.stringify(payload));
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  _getPreferencesKey() {
+    const chainId = Number(CONFIG?.NETWORK?.CHAIN_ID || 0);
+    const address = String(CONFIG?.CONTRACT?.ADDRESS || '').toLowerCase();
+    const wallet = (window.walletManager?.getAddress?.() || '').toLowerCase();
+    if (!chainId || !address || !wallet) return null;
+    return `liberdus_token_ui:overview:prefs:v1:${chainId}:${address}:${wallet}`;
   }
 }
