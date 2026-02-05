@@ -266,19 +266,40 @@ textarea:focus-visible {
   align-items: center;
   gap: 6px;
   margin-bottom: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+  font-size: var(--font-size-sm);
+  color: var(--text-color);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
 }
 
-.lock-details-toggle::after {
+.lock-details-toggle::before {
   content: '▸';
-  font-size: 0.72em;
+  font-size: 1em;
   line-height: 1;
   opacity: 0.72;
   transition: opacity 0.16s ease;
 }
 
-.lock-details-toggle[aria-expanded='true']::after {
+.lock-details-toggle[aria-expanded='true']::before {
   content: '▾';
   opacity: 0.78;
+}
+
+.lock-details-toggle:focus-visible {
+  outline: none;
+}
+
+.lock-details-toggle:hover,
+.lock-details-toggle:focus-visible,
+.history-advanced-summary:hover,
+.history-advanced-summary:focus-visible {
+  color: var(--secondary-text-color);
+  text-decoration: underline;
 }
 
 .lock-progress-header {
@@ -590,8 +611,9 @@ textarea:focus-visible {
 .history-advanced-summary {
   cursor: pointer;
   font-size: var(--font-size-sm);
-  color: var(--secondary-text-color);
+  color: var(--text-color);
   user-select: none;
+  font-weight: var(--font-weight-medium);
 }
 
 .history-advanced-panel {

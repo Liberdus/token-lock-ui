@@ -44,7 +44,7 @@ export class HistoryTab {
             My completed locks
           </label>
           <details class="history-advanced" data-history-advanced>
-            <summary class="history-advanced-summary">Advanced filters</summary>
+            <summary class="history-advanced-summary" title="Toggle advanced filters">Advanced filters</summary>
             <div class="history-advanced-panel">
               <div class="form-grid history-advanced-grid">
               <label class="field">

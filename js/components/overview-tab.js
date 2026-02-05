@@ -631,10 +631,11 @@ export class OverviewTab {
 
         <button
           type="button"
-          class="btn lock-details-toggle"
+          class="lock-details-toggle"
           data-lock-details-toggle="${entry.id}"
           aria-expanded="${detailsExpanded ? 'true' : 'false'}"
           aria-controls="lock-details-${entry.id}"
+          title="Toggle lock details"
         >Lock Details</button>
 
         <div
