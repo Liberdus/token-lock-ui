@@ -485,7 +485,6 @@ export class OverviewTab {
     const withdrawUnavailableReason = showWithdraw ? this._getWithdrawUnavailableReason(lock, entry.available ?? null) : '';
     const retractUnavailableReason = showRetract ? this._getRetractUnavailableReason(lock) : '';
     const detailsExpanded = this._expandedLockDetails.has(entry.id);
-    const detailsArrow = detailsExpanded ? '▼' : '▶';
 
     return `
       <div class="card lock-card">
@@ -585,7 +584,7 @@ export class OverviewTab {
           data-lock-details-toggle="${entry.id}"
           aria-expanded="${detailsExpanded ? 'true' : 'false'}"
           aria-controls="lock-details-${entry.id}"
-        >Lock Details ${detailsArrow}</button>
+        >Lock Details</button>
 
         <div
           class="lock-grid"

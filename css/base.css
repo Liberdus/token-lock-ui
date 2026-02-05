@@ -262,7 +262,23 @@ textarea:focus-visible {
 }
 
 .lock-details-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 12px;
+}
+
+.lock-details-toggle::after {
+  content: '▸';
+  font-size: 0.72em;
+  line-height: 1;
+  opacity: 0.72;
+  transition: opacity 0.16s ease;
+}
+
+.lock-details-toggle[aria-expanded='true']::after {
+  content: '▾';
+  opacity: 0.78;
 }
 
 .lock-progress-header {
