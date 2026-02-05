@@ -2,6 +2,8 @@ import { CONFIG } from '../config.js';
 import { extractErrorMessage, normalizeErrorMessage } from '../utils/transaction-helpers.js';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+const TOKEN_META_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const HISTORY_CACHE_REORG_BUFFER = 20;
 
 export class HistoryTab {
   constructor() {
@@ -9,6 +11,8 @@ export class HistoryTab {
     this._loaded = false;
     this._tokenMeta = new Map();
     this._blockTimeCache = new Map();
+    this._historyEvents = [];
+    this._lastProvider = null;
   }
 
   load() {
@@ -88,7 +92,10 @@ export class HistoryTab {
 
     this.loadBtn?.addEventListener('click', () => this._loadHistory());
     this.panel?.addEventListener('click', (e) => this._handlePanelClick(e));
-    this.mineInput?.addEventListener('change', () => this._savePreferences());
+    this.mineInput?.addEventListener('change', () => {
+      this._savePreferences();
+      this._applyHistoryFilters();
+    });
 
     document.addEventListener('walletConnected', () => this._syncMineFilterFromWallet());
     document.addEventListener('walletAccountChanged', () => this._syncMineFilterFromWallet());
@@ -143,9 +150,20 @@ export class HistoryTab {
       const eventTopic = iface.getEventTopic('LockClosed');
       const latest = toBlock === 'latest' ? await provider.getBlockNumber() : toBlock;
 
+      const defaultFrom = Number(CONFIG?.CONTRACT?.DEPLOYMENT_BLOCK || 0);
+      const isDefaultFrom = Number.isFinite(defaultFrom) ? fromBlock === defaultFrom : fromBlock === 0;
+      const isDefaultTo = !toBlockRaw;
+      const useCache = isDefaultFrom && isDefaultTo && !creatorFilter && !withdrawFilter;
+      const cached = useCache ? this._readHistoryCache() : null;
+      const cachedEvents = Array.isArray(cached?.events) ? cached.events : [];
+
+      const resumeFrom = useCache && Number.isFinite(cached?.lastScannedBlock)
+        ? Math.max(fromBlock, cached.lastScannedBlock - HISTORY_CACHE_REORG_BUFFER)
+        : fromBlock;
+
       const chunk = 3000;
-      const events = [];
-      for (let start = fromBlock; start <= latest; start += chunk + 1) {
+      const freshEvents = [];
+      for (let start = resumeFrom; start <= latest; start += chunk + 1) {
         const end = Math.min(latest, start + chunk);
         this._setStatus(`Scanning blocks ${start} - ${end}...`);
         const logs = await this._getLogsWithRetry(provider, {
@@ -157,19 +175,7 @@ export class HistoryTab {
         for (const log of logs) {
           try {
             const parsed = iface.parseLog(log);
-            const args = parsed.args;
-            const creator = String(args.creator).toLowerCase();
-            const withdrawAddress = String(args.withdrawAddress).toLowerCase();
-            if (mineOnly && me) {
-              if (creator !== me && withdrawAddress !== me) continue;
-            }
-            if (creatorFilter && creator !== creatorFilter) continue;
-            if (withdrawFilter && withdrawAddress !== withdrawFilter) continue;
-            events.push({
-              blockNumber: log.blockNumber,
-              txHash: log.transactionHash,
-              ...args,
-            });
+            freshEvents.push(this._buildHistoryEvent(log, parsed.args));
           } catch {
             // ignore
           }
@@ -178,8 +184,29 @@ export class HistoryTab {
         await this._sleep(120);
       }
 
-      await this._renderHistory(events, provider);
-      this._setStatus(`Loaded ${events.length} closed locks.`);
+      const mergedEvents = useCache
+        ? this._mergeHistoryEvents(cachedEvents, freshEvents)
+        : freshEvents;
+
+      if (useCache) {
+        this._writeHistoryCache({
+          lastScannedBlock: latest,
+          events: mergedEvents,
+        });
+      }
+
+      this._historyEvents = mergedEvents;
+      this._lastProvider = provider;
+
+      const displayEvents = this._filterHistoryEvents(mergedEvents, {
+        mineOnly,
+        me,
+        creatorFilter,
+        withdrawFilter,
+      });
+
+      await this._renderHistory(displayEvents, provider);
+      this._setStatus(`Loaded ${displayEvents.length} closed locks.`);
     } catch (err) {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Failed to load history'));
       window.toastManager?.error(msg, { title: 'History load failed' });
@@ -300,14 +327,45 @@ export class HistoryTab {
     this.listEl.innerHTML = rows.join('');
   }
 
+  async _applyHistoryFilters() {
+    if (!this._historyEvents.length) return;
+    const provider = this._lastProvider
+      || window.contractManager.getReadContract()?.provider
+      || window.contractManager.getProvider?.();
+    if (!provider) return;
+
+    const creatorFilter = (this.creatorInput?.value || '').trim().toLowerCase();
+    const withdrawFilter = (this.withdrawInput?.value || '').trim().toLowerCase();
+    const mineOnly = !!this.mineInput?.checked;
+    const me = (window.walletManager?.getAddress?.() || '').toLowerCase();
+
+    const displayEvents = this._filterHistoryEvents(this._historyEvents, {
+      mineOnly,
+      me,
+      creatorFilter,
+      withdrawFilter,
+    });
+    await this._renderHistory(displayEvents, provider);
+    this._setStatus(`Loaded ${displayEvents.length} closed locks.`);
+  }
+
   async _primeTokenMetadata(events = []) {
-    const pending = Array.from(
+    const pending = [];
+    Array.from(
       new Set(
         (events || [])
           .map((e) => String(e?.token || '').toLowerCase())
-          .filter((addr) => addr && addr !== ZERO_ADDRESS && !this._tokenMeta.has(addr))
+          .filter((addr) => addr && addr !== ZERO_ADDRESS)
       )
-    );
+    ).forEach((addr) => {
+      if (this._tokenMeta.has(addr)) return;
+      const cached = this._readTokenMetaCache(addr);
+      if (cached) {
+        this._tokenMeta.set(addr, cached);
+        return;
+      }
+      pending.push(addr);
+    });
     if (!pending.length) return;
 
     try {
@@ -315,7 +373,9 @@ export class HistoryTab {
       if (batchMap instanceof Map) {
         pending.forEach((addr) => {
           const meta = batchMap.get(addr);
-          this._tokenMeta.set(addr, meta || { symbol: '', decimals: 18 });
+          const resolved = meta || { symbol: '', decimals: 18 };
+          this._tokenMeta.set(addr, resolved);
+          this._writeTokenMetaCache(addr, resolved);
         });
         return;
       }
@@ -392,13 +452,175 @@ export class HistoryTab {
     const key = (token || '').toLowerCase();
     if (!key || key === ZERO_ADDRESS) return { symbol: '', decimals: 18 };
     if (this._tokenMeta.has(key)) return this._tokenMeta.get(key);
+    const cached = this._readTokenMetaCache(key);
+    if (cached) {
+      this._tokenMeta.set(key, cached);
+      return cached;
+    }
     try {
       const meta = await window.contractManager.getTokenMetadata(token);
-      this._tokenMeta.set(key, meta || { symbol: '', decimals: 18 });
+      const resolved = meta || { symbol: '', decimals: 18 };
+      this._tokenMeta.set(key, resolved);
+      this._writeTokenMetaCache(key, resolved);
     } catch {
-      this._tokenMeta.set(key, { symbol: '', decimals: 18 });
+      const fallback = { symbol: '', decimals: 18 };
+      this._tokenMeta.set(key, fallback);
+      this._writeTokenMetaCache(key, fallback);
     }
     return this._tokenMeta.get(key);
+  }
+
+  _filterHistoryEvents(events = [], { mineOnly, me, creatorFilter, withdrawFilter } = {}) {
+    const meLower = String(me || '').toLowerCase();
+    const creatorNeedle = String(creatorFilter || '').toLowerCase();
+    const withdrawNeedle = String(withdrawFilter || '').toLowerCase();
+    return (events || []).filter((e) => {
+      const creator = String(e?.creator || '').toLowerCase();
+      const withdrawAddress = String(e?.withdrawAddress || '').toLowerCase();
+      if (mineOnly && meLower) {
+        if (creator !== meLower && withdrawAddress !== meLower) return false;
+      }
+      if (creatorNeedle && creator !== creatorNeedle) return false;
+      if (withdrawNeedle && withdrawAddress !== withdrawNeedle) return false;
+      return true;
+    });
+  }
+
+  _buildHistoryEvent(log, args) {
+    const normalized = this._normalizeLockClosedArgs(args);
+    return {
+      blockNumber: Number(log?.blockNumber ?? 0),
+      txHash: String(log?.transactionHash || ''),
+      logIndex: Number(log?.logIndex ?? 0),
+      ...normalized,
+    };
+  }
+
+  _normalizeLockClosedArgs(args) {
+    const val = (v, fallback = '0') => {
+      if (v == null) return fallback;
+      if (typeof v === 'string' || typeof v === 'number' || typeof v === 'bigint') return String(v);
+      if (typeof v?.toString === 'function') return v.toString();
+      return fallback;
+    };
+    return {
+      lockId: val(args?.lockId),
+      reason: val(args?.reason),
+      creator: String(args?.creator || ''),
+      token: String(args?.token || ''),
+      withdrawAddress: String(args?.withdrawAddress || ''),
+      amount: val(args?.amount),
+      withdrawn: val(args?.withdrawn),
+      cliffDays: val(args?.cliffDays),
+      ratePerDay: val(args?.ratePerDay),
+      unlockTime: val(args?.unlockTime),
+      unlocked: !!args?.unlocked,
+    };
+  }
+
+  _mergeHistoryEvents(base = [], incoming = []) {
+    const map = new Map();
+    const insert = (e) => {
+      const key = this._historyEventKey(e);
+      map.set(key, e);
+    };
+    (base || []).forEach(insert);
+    (incoming || []).forEach(insert);
+    return Array.from(map.values());
+  }
+
+  _historyEventKey(e) {
+    const txHash = String(e?.txHash || '');
+    const logIndex = Number(e?.logIndex ?? -1);
+    if (txHash && logIndex >= 0) return `${txHash}:${logIndex}`;
+    const lockId = String(e?.lockId ?? '');
+    const blockNumber = Number(e?.blockNumber ?? 0);
+    return `${lockId}:${blockNumber}`;
+  }
+
+  _getHistoryCacheKey() {
+    const chainId = Number(CONFIG?.NETWORK?.CHAIN_ID || 0);
+    const address = String(CONFIG?.CONTRACT?.ADDRESS || '').toLowerCase();
+    if (!chainId || !address) return null;
+    return `liberdus_token_ui:history:cache:v1:${chainId}:${address}`;
+  }
+
+  _readHistoryCache() {
+    const key = this._getHistoryCacheKey();
+    if (!key) return null;
+    try {
+      const raw = window.localStorage?.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      const lastScannedBlock = Number(parsed.lastScannedBlock);
+      const events = Array.isArray(parsed.events) ? parsed.events : [];
+      return {
+        lastScannedBlock: Number.isFinite(lastScannedBlock) ? lastScannedBlock : null,
+        events,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  _writeHistoryCache({ lastScannedBlock, events } = {}) {
+    const key = this._getHistoryCacheKey();
+    if (!key) return;
+    try {
+      const payload = {
+        lastScannedBlock: Number.isFinite(lastScannedBlock) ? Number(lastScannedBlock) : null,
+        events: Array.isArray(events) ? events : [],
+        savedAt: Date.now(),
+      };
+      window.localStorage?.setItem(key, JSON.stringify(payload));
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  _getTokenMetaCacheKey(token) {
+    const chainId = Number(CONFIG?.NETWORK?.CHAIN_ID || 0);
+    const addr = String(token || '').toLowerCase();
+    if (!chainId || !addr || addr === ZERO_ADDRESS) return null;
+    return `liberdus_token_ui:token_meta:v1:${chainId}:${addr}`;
+  }
+
+  _readTokenMetaCache(token) {
+    const key = this._getTokenMetaCacheKey(token);
+    if (!key) return null;
+    try {
+      const raw = window.localStorage?.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
+        window.localStorage?.removeItem(key);
+        return null;
+      }
+      const decimalsValue = Number(parsed.decimals);
+      return {
+        symbol: typeof parsed.symbol === 'string' ? parsed.symbol : '',
+        decimals: Number.isFinite(decimalsValue) ? decimalsValue : 18,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  _writeTokenMetaCache(token, meta) {
+    const key = this._getTokenMetaCacheKey(token);
+    if (!key) return;
+    try {
+      const payload = {
+        symbol: typeof meta?.symbol === 'string' ? meta.symbol : '',
+        decimals: Number(meta?.decimals ?? 18),
+        expiresAt: Date.now() + TOKEN_META_CACHE_TTL_MS,
+      };
+      window.localStorage?.setItem(key, JSON.stringify(payload));
+    } catch {
+      // Ignore storage errors
+    }
   }
 
   async _getBlockTime(provider, blockNumber) {
