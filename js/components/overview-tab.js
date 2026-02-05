@@ -13,6 +13,7 @@ export class OverviewTab {
     this._tokens = new Set();
     this._expandedLockDetails = new Set();
     this._scanInFlight = false;
+    this._hasLoaded = false;
     this._currentPage = 1;
   }
 
@@ -93,7 +94,7 @@ export class OverviewTab {
     this.countEl = this.panel.querySelector('[data-overview-count]');
     this.loadMoreBtn = this.panel.querySelector('[data-overview-load-more]');
 
-    this.refreshBtn?.addEventListener('click', () => this.refreshLocks());
+    this.refreshBtn?.addEventListener('click', () => this.refreshLocks({ force: true }));
     this.filterMine?.addEventListener('change', () => {
       this._savePreferences();
       this._resetAndRender();
@@ -150,9 +151,32 @@ export class OverviewTab {
     return this._tokenMeta.get(key);
   }
 
-  async refreshLocks() {
+  _setLoading(isLoading, message = 'Loading locks…') {
+    if (this.refreshBtn) this.refreshBtn.disabled = !!isLoading;
+    if (!this.locksListEl) return;
+    this.locksListEl.setAttribute('aria-busy', isLoading ? 'true' : 'false');
+    if (!isLoading) {
+      if (!this._hasLoaded) {
+        this.locksListEl.innerHTML = '<p class="muted">No locks loaded.</p>';
+      }
+      return;
+    }
+    this.locksListEl.innerHTML = `
+      <div class="muted" style="display:flex; align-items:center; gap:8px;">
+        <span class="notification-icon" aria-hidden="true"><span class="spinner"></span></span>
+        <span>${message}</span>
+      </div>
+    `;
+  }
+
+  async refreshLocks({ force = false } = {}) {
     if (this._scanInFlight) return;
+    if (this._hasLoaded && !force) {
+      this.renderLocks();
+      return;
+    }
     this._scanInFlight = true;
+    this._setLoading(true);
 
     try {
       const count = await window.contractManager.getActiveLockCount();
@@ -166,11 +190,16 @@ export class OverviewTab {
       }
 
       await this._loadLocks(ids);
+      this._hasLoaded = true;
     } catch (err) {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Failed to load locks'));
       window.toastManager?.error(msg, { title: 'Load failed' });
     } finally {
       this._scanInFlight = false;
+      this._setLoading(false);
+      if (this._hasLoaded) {
+        this.renderLocks();
+      }
     }
   }
 
