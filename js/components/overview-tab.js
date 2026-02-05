@@ -481,6 +481,9 @@ export class OverviewTab {
     const showUnlock = !!isCreator;
     const showWithdraw = !!isWithdrawer;
     const showRetract = !!isCreator;
+    const unlockUnavailableReason = showUnlock ? this._getUnlockUnavailableReason(lock) : '';
+    const withdrawUnavailableReason = showWithdraw ? this._getWithdrawUnavailableReason(lock, entry.available ?? null) : '';
+    const retractUnavailableReason = showRetract ? this._getRetractUnavailableReason(lock) : '';
     const detailsExpanded = this._expandedLockDetails.has(entry.id);
     const detailsArrow = detailsExpanded ? '▼' : '▶';
 
@@ -502,28 +505,31 @@ export class OverviewTab {
             ${showRetract ? `
             <button
               type="button"
-              class="btn btn--danger"
+              class="btn btn--danger${retractUnavailableReason ? ' btn--looks-disabled' : ''}"
               data-retract-btn
               data-retract-id="${entry.id}"
-              title="Retract this lock"
+              ${retractUnavailableReason ? 'aria-disabled="true"' : ''}
+              title="${retractUnavailableReason || 'Retract this lock'}"
             >Retract</button>
             ` : ''}
             ${showUnlock ? `
               <button
                 type="button"
-                class="btn btn--primary"
+                class="btn btn--primary${unlockUnavailableReason ? ' btn--looks-disabled' : ''}"
                 data-unlock-btn
                 data-unlock-id="${entry.id}"
-                title="Unlock this lock"
+                ${unlockUnavailableReason ? 'aria-disabled="true"' : ''}
+                title="${unlockUnavailableReason || 'Unlock this lock'}"
               >Unlock</button>
             ` : ''}
             ${showWithdraw ? `
               <button
                 type="button"
-                class="btn btn--success"
+                class="btn btn--success${withdrawUnavailableReason ? ' btn--looks-disabled' : ''}"
                 data-withdraw-btn
                 data-withdraw-id="${entry.id}"
-                title="Withdraw unlocked tokens"
+                ${withdrawUnavailableReason ? 'aria-disabled="true"' : ''}
+                title="${withdrawUnavailableReason || 'Withdraw unlocked tokens'}"
               >Withdraw</button>
             ` : ''}
           </div>

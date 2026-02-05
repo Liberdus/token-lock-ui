@@ -761,6 +761,42 @@ textarea:focus-visible {
   background: transparent;
 }
 
+.btn--looks-disabled:not(:disabled),
+.btn[aria-disabled="true"]:not(:disabled) {
+  cursor: pointer;
+  opacity: 0.55;
+  filter: saturate(0.35);
+}
+
+.btn--looks-disabled:active:not(:disabled),
+.btn[aria-disabled="true"]:active:not(:disabled) {
+  transform: none;
+}
+
+.btn.btn--looks-disabled:hover:not(:disabled),
+.btn[aria-disabled="true"]:hover:not(:disabled) {
+  background: var(--button-background);
+  border-color: var(--border-color);
+}
+
+.btn--primary.btn--looks-disabled:hover:not(:disabled),
+.btn--primary[aria-disabled="true"]:hover:not(:disabled) {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.btn--danger.btn--looks-disabled:hover:not(:disabled),
+.btn--danger[aria-disabled="true"]:hover:not(:disabled) {
+  background: var(--danger-color);
+  border-color: var(--danger-color);
+}
+
+.btn--success.btn--looks-disabled:hover:not(:disabled),
+.btn--success[aria-disabled="true"]:hover:not(:disabled) {
+  background: var(--success-color);
+  border-color: var(--success-color);
+}
+
 .btn--icon {
   padding: 8px;
   display: inline-flex;
