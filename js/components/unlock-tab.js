@@ -327,7 +327,7 @@ export class LockActionToasts {
         window.toastManager?.dismiss?.(this._unlockFormToastId);
         this._unlockFormToastId = null;
       }
-      window.overviewTab?.refreshLocks?.();
+      window.overviewTab?.refreshLocks?.({ force: true });
     } catch (err) {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Unlock failed'));
       window.toastManager?.error(msg, { title: 'Unlock failed' });
@@ -467,7 +467,7 @@ export class LockActionToasts {
         window.toastManager?.dismiss?.(this._withdrawFormToastId);
         this._withdrawFormToastId = null;
       }
-      window.overviewTab?.refreshLocks?.();
+      window.overviewTab?.refreshLocks?.({ force: true });
     } catch (err) {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Withdraw failed'));
       window.toastManager?.error(msg, { title: 'Withdraw failed' });
@@ -497,7 +497,7 @@ export class LockActionToasts {
         window.toastManager?.dismiss?.(this._retractFormToastId);
         this._retractFormToastId = null;
       }
-      window.overviewTab?.refreshLocks?.();
+      window.overviewTab?.refreshLocks?.({ force: true });
     } catch (err) {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Retract failed'));
       window.toastManager?.error(msg, { title: 'Retract failed' });
@@ -633,7 +633,7 @@ export class LockActionToasts {
           window.toastManager?.dismiss?.(this._lockFormToastId);
           this._lockFormToastId = null;
         }
-        window.overviewTab?.refreshLocks?.();
+        window.overviewTab?.refreshLocks?.({ force: true });
       } catch (innerErr) {
         if (flowToastId) window.toastManager?.dismiss?.(flowToastId);
         if (lockToastId) window.toastManager?.dismiss?.(lockToastId);
