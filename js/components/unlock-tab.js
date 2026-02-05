@@ -1,6 +1,7 @@
 import { CONFIG } from '../config.js';
 import { readTokenMetaCache, writeTokenMetaCache } from '../utils/token-meta-cache.js';
 import { extractErrorMessage, normalizeErrorMessage, formatTxMessage } from '../utils/transaction-helpers.js';
+import { setFieldError, clearFieldError, clearFormErrors } from '../utils/form-validation.js';
 
 const RATE_SCALE = 1_000_000_000_000;
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
@@ -43,7 +44,11 @@ export class LockActionToasts {
     this._setUnlockInputMin(earliestUnlockTime);
     this._setUnlockInputValue(this._getLocalDateTimeString(new Date(earliestUnlockTime * 1000)));
 
-    this.unlockTimeInput?.addEventListener('input', () => this._enforceUnlockTimeMin());
+    clearFormErrors([this.unlockTimeInput]);
+    this.unlockTimeInput?.addEventListener('input', () => {
+      clearFieldError(this.unlockTimeInput);
+      this._enforceUnlockTimeMin();
+    });
     this.submitBtn?.addEventListener('click', () => this._submitUnlock());
   }
 
@@ -102,16 +107,21 @@ export class LockActionToasts {
       this._loadWithdrawLock().catch(() => {});
     }
 
+    clearFormErrors([this.withdrawAmountInput, this.withdrawPercentInput, this.withdrawToInput]);
+
     this.withdrawAmountInput?.addEventListener('input', () => {
+      clearFieldError(this.withdrawAmountInput);
       if ((this.withdrawAmountInput.value || '').trim()) {
         if (this.withdrawPercentInput) this.withdrawPercentInput.value = '';
       }
     });
     this.withdrawPercentInput?.addEventListener('input', () => {
+      clearFieldError(this.withdrawPercentInput);
       if ((this.withdrawPercentInput.value || '').trim()) {
         if (this.withdrawAmountInput) this.withdrawAmountInput.value = '';
       }
     });
+    this.withdrawToInput?.addEventListener('input', () => clearFieldError(this.withdrawToInput));
     this.withdrawMaxBtn?.addEventListener('click', () => {
       this.withdrawPercentInput.value = '100';
       this.withdrawAmountInput.value = '';
@@ -146,6 +156,8 @@ export class LockActionToasts {
       this.retractIdDisplay.textContent = this._activeRetractLockId != null ? `#${this._activeRetractLockId}` : '—';
     }
 
+    clearFormErrors([this.retractToInput]);
+    this.retractToInput?.addEventListener('input', () => clearFieldError(this.retractToInput));
     this.retractSubmitBtn?.addEventListener('click', () => this._submitRetract());
   }
 
@@ -189,9 +201,26 @@ export class LockActionToasts {
     this._lockRetractPolicyApplying = false;
     this._lockWithdrawTouched = false;
 
-    this.lockDurationInput?.addEventListener('input', () => this._updateLockRate());
-    this.lockTokenInput?.addEventListener('input', () => this._scheduleLockTokenMetaLoad());
+    clearFormErrors([
+      this.lockTokenInput,
+      this.lockAmountInput,
+      this.lockCliffInput,
+      this.lockDurationInput,
+      this.lockWithdrawInput,
+    ]);
+
+    this.lockDurationInput?.addEventListener('input', () => {
+      clearFieldError(this.lockDurationInput);
+      this._updateLockRate();
+    });
+    this.lockTokenInput?.addEventListener('input', () => {
+      clearFieldError(this.lockTokenInput);
+      this._scheduleLockTokenMetaLoad();
+    });
     this.lockTokenInput?.addEventListener('blur', () => this._loadLockTokenMeta());
+    this.lockAmountInput?.addEventListener('input', () => clearFieldError(this.lockAmountInput));
+    this.lockCliffInput?.addEventListener('input', () => clearFieldError(this.lockCliffInput));
+    this.lockWithdrawInput?.addEventListener('input', () => clearFieldError(this.lockWithdrawInput));
     this.lockWithdrawInput?.addEventListener('input', () => {
       this._lockWithdrawTouched = true;
       this._applyRetractDisableDefault();
@@ -208,6 +237,7 @@ export class LockActionToasts {
         <label class="field">
           <span class="field-label">Unlock Time</span>
           <input class="field-input" data-unlock-time type="datetime-local" step="60" />
+          <span class="field-message"></span>
         </label>
       </div>
       <div class="actions">
@@ -234,14 +264,17 @@ export class LockActionToasts {
         <label class="field">
           <span class="field-label">Amount (tokens)</span>
           <input class="field-input" data-withdraw-amount type="number" min="0" step="any" placeholder="Enter amount" />
+          <span class="field-message"></span>
         </label>
         <label class="field">
           <span class="field-label">Percent (0-100)</span>
           <input class="field-input" data-withdraw-percent type="number" min="0" max="100" step="0.01" placeholder="Enter percent" />
+          <span class="field-message"></span>
         </label>
         <label class="field field--full">
           <span class="field-label">Withdraw To (optional)</span>
           <input class="field-input" data-withdraw-to placeholder="Defaults to withdraw address" />
+          <span class="field-message"></span>
         </label>
       </div>
       <div class="actions">
@@ -261,6 +294,7 @@ export class LockActionToasts {
         <label class="field">
           <span class="field-label">Retract To (optional)</span>
           <input class="field-input" data-retract-to placeholder="Defaults to creator" />
+          <span class="field-message"></span>
         </label>
       </div>
       <div class="actions">
@@ -275,6 +309,7 @@ export class LockActionToasts {
         <label class="field field--full">
           <span class="field-label">Token Address</span>
           <input class="field-input" data-lock-token placeholder="Enter token address (0x...)" />
+          <span class="field-message"></span>
         </label>
         <label class="field field--inline-readonly">
           <span class="field-label">Token Symbol</span>
@@ -287,14 +322,17 @@ export class LockActionToasts {
         <label class="field">
           <span class="field-label">Amount (tokens)</span>
           <input class="field-input" data-lock-amount type="number" min="0" step="any" placeholder="Enter amount" />
+          <span class="field-message"></span>
         </label>
         <label class="field">
           <span class="field-label">Cliff (days)</span>
           <input class="field-input" data-lock-cliff type="number" min="0" step="1" placeholder="Enter cliff days" />
+          <span class="field-message"></span>
         </label>
         <label class="field">
           <span class="field-label">Vesting Duration (days)</span>
           <input class="field-input" data-lock-duration type="number" min="1" step="1" placeholder="Enter vesting duration (e.g. 365 days)" />
+          <span class="field-message"></span>
         </label>
         <label class="field field--inline-readonly">
           <span class="field-label">Daily %</span>
@@ -303,6 +341,7 @@ export class LockActionToasts {
         <label class="field field--full">
           <span class="field-label">Withdraw Address (optional)</span>
           <input class="field-input" data-lock-withdraw placeholder="Defaults to your wallet" />
+          <span class="field-message"></span>
         </label>
         <div class="field field--full">
           <span class="field-label">Disable retract after</span>
@@ -325,14 +364,16 @@ export class LockActionToasts {
   }
 
   async _submitUnlock() {
+    const validation = this._validateUnlockForm();
+    if (!validation.ok) return;
+
     try {
       const lockId = Number(this._activeLockId);
       if (!Number.isFinite(lockId) || lockId < 0) throw new Error('Invalid lock ID');
 
       const chainNow = await this._getChainTimestamp();
       const minUnlockTime = chainNow + UNLOCK_TIME_BUFFER_SECONDS;
-      let unlockTime = this._parseUnlockInputToSeconds();
-      if (!Number.isFinite(unlockTime) || unlockTime <= 0) throw new Error('Invalid unlock time');
+      let unlockTime = validation.values.unlockTime;
       if (unlockTime < minUnlockTime) {
         unlockTime = minUnlockTime;
         this._setUnlockInputMin(unlockTime);
@@ -444,6 +485,9 @@ export class LockActionToasts {
   }
 
   async _submitWithdraw() {
+    const validation = this._validateWithdrawForm();
+    if (!validation.ok) return;
+
     try {
       const lockId = Number(this._activeWithdrawLockId);
       if (!Number.isFinite(lockId) || lockId < 0) throw new Error('Invalid lock ID');
@@ -451,14 +495,13 @@ export class LockActionToasts {
         await this._loadWithdrawLock();
       }
 
-      const amountStr = (this.withdrawAmountInput?.value || '').trim();
-      const percentStr = (this.withdrawPercentInput?.value || '').trim();
-      const to = (this.withdrawToInput?.value || '').trim();
-
-      const hasAmount = amountStr !== '' && Number(amountStr) > 0;
-      const hasPercent = percentStr !== '' && Number(percentStr) > 0;
-      if (hasAmount && hasPercent) throw new Error('Use amount or percent, not both');
-      if (!hasAmount && !hasPercent) throw new Error('Enter amount or percent');
+      const {
+        amountStr,
+        percentStr,
+        to,
+        hasAmount,
+        hasPercent,
+      } = validation.values;
 
       let amount = window.ethers.BigNumber.from(0);
       let percent = 0;
@@ -469,7 +512,6 @@ export class LockActionToasts {
         percent = 0;
       } else {
         const pct = Number(percentStr);
-        if (!Number.isFinite(pct) || pct <= 0 || pct > 100) throw new Error('Percent must be 0-100');
         percent = Math.floor((RATE_SCALE * pct) / 100);
         amount = window.ethers.BigNumber.from(0);
       }
@@ -501,10 +543,13 @@ export class LockActionToasts {
   }
 
   async _submitRetract() {
+    const validation = this._validateRetractForm();
+    if (!validation.ok) return;
+
     try {
       const lockId = Number(this._activeRetractLockId);
       if (!Number.isFinite(lockId) || lockId < 0) throw new Error('Invalid lock ID');
-      const to = (this.retractToInput?.value || '').trim();
+      const { to } = validation.values;
 
       const loadingId = window.toastManager?.loading('Submitting retract...', { delayMs: 0 });
       const tx = await window.contractManager.retract({
@@ -588,25 +633,21 @@ export class LockActionToasts {
   }
 
   async _submitLock() {
+    const validation = this._validateLockForm();
+    if (!validation.ok) return;
+
     try {
-      const tokenInput = (this.lockTokenInput?.value || '').trim();
-      const token = this._normalizeAddress(tokenInput);
-      const amount = Number(this.lockAmountInput?.value || 0);
-      const cliffDays = Number(this.lockCliffInput?.value || 0);
-      const durationDays = Number(this.lockDurationInput?.value || 0);
-      const ratePerDay = Number.isFinite(durationDays) && durationDays > 0
-        ? Math.floor(RATE_SCALE / durationDays)
-        : 0;
-      const withdrawAddress = (this.lockWithdrawInput?.value || '').trim();
+      const {
+        token,
+        amount,
+        cliffDays,
+        ratePerDay,
+        withdrawAddress,
+      } = validation.values;
       let retractUntilUnlock = !!this.lockRetractDisableUnlockInput?.checked;
       if (!retractUntilUnlock && !this.lockRetractDisableWithdrawInput?.checked) {
         retractUntilUnlock = false;
       }
-
-      if (!token) throw new Error('Token address required');
-      if (!amount || amount <= 0) throw new Error('Amount must be > 0');
-      if (!Number.isFinite(cliffDays) || cliffDays < 0) throw new Error('Invalid cliff');
-      if (!ratePerDay || ratePerDay <= 0) throw new Error('Invalid rate');
 
       const meta = await this._ensureLockFormTokenMeta(token);
       if (meta.decimals == null) throw new Error('Load token info first');
@@ -702,6 +743,183 @@ export class LockActionToasts {
       this.lockSymbolInput.textContent = this._lockFormTokenMeta.symbol || '—';
     }
     return this._lockFormTokenMeta;
+  }
+
+  _validateUnlockForm() {
+    clearFormErrors([this.unlockTimeInput]);
+    const raw = (this.unlockTimeInput?.value || '').trim();
+    const unlockTime = this._parseUnlockInputToSeconds();
+    if (!raw) {
+      setFieldError(this.unlockTimeInput, 'Unlock time is required.');
+      return { ok: false };
+    }
+    if (!Number.isFinite(unlockTime) || unlockTime <= 0) {
+      setFieldError(this.unlockTimeInput, 'Unlock time is invalid.');
+      return { ok: false };
+    }
+    return { ok: true, values: { unlockTime } };
+  }
+
+  _validateWithdrawForm() {
+    clearFormErrors([this.withdrawAmountInput, this.withdrawPercentInput, this.withdrawToInput]);
+    const amountStr = (this.withdrawAmountInput?.value || '').trim();
+    const percentStr = (this.withdrawPercentInput?.value || '').trim();
+    const toRaw = (this.withdrawToInput?.value || '').trim();
+
+    let ok = true;
+    const hasAmount = amountStr !== '';
+    const hasPercent = percentStr !== '';
+
+    if (hasAmount && hasPercent) {
+      ok = false;
+      setFieldError(this.withdrawAmountInput, 'Use amount or percent, not both.');
+      setFieldError(this.withdrawPercentInput, 'Use amount or percent, not both.');
+    }
+
+    if (!hasAmount && !hasPercent) {
+      ok = false;
+      setFieldError(this.withdrawAmountInput, 'Enter an amount or percent.');
+      setFieldError(this.withdrawPercentInput, 'Enter an amount or percent.');
+    }
+
+    if (hasAmount) {
+      const amount = Number(amountStr);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        ok = false;
+        setFieldError(this.withdrawAmountInput, 'Amount must be greater than 0.');
+      }
+    }
+
+    if (hasPercent) {
+      const pct = Number(percentStr);
+      if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+        ok = false;
+        setFieldError(this.withdrawPercentInput, 'Percent must be between 0 and 100.');
+      }
+    }
+
+    let to = '';
+    if (toRaw) {
+      to = this._normalizeAddress(toRaw);
+      if (!to) {
+        ok = false;
+        setFieldError(this.withdrawToInput, 'Withdraw address is not valid.');
+      }
+    }
+
+    if (!ok) return { ok };
+    return {
+      ok,
+      values: {
+        amountStr,
+        percentStr,
+        to,
+        hasAmount,
+        hasPercent,
+      },
+    };
+  }
+
+  _validateRetractForm() {
+    clearFormErrors([this.retractToInput]);
+    const toRaw = (this.retractToInput?.value || '').trim();
+    let to = '';
+    if (toRaw) {
+      to = this._normalizeAddress(toRaw);
+      if (!to) {
+        setFieldError(this.retractToInput, 'Retract address is not valid.');
+        return { ok: false };
+      }
+    }
+    return { ok: true, values: { to } };
+  }
+
+  _validateLockForm() {
+    clearFormErrors([
+      this.lockTokenInput,
+      this.lockAmountInput,
+      this.lockCliffInput,
+      this.lockDurationInput,
+      this.lockWithdrawInput,
+    ]);
+
+    const tokenInput = (this.lockTokenInput?.value || '').trim();
+    const token = this._normalizeAddress(tokenInput);
+    const amountRaw = (this.lockAmountInput?.value || '').trim();
+    const cliffRaw = (this.lockCliffInput?.value || '').trim();
+    const durationRaw = (this.lockDurationInput?.value || '').trim();
+    const withdrawRaw = (this.lockWithdrawInput?.value || '').trim();
+
+    let ok = true;
+
+    if (!tokenInput) {
+      ok = false;
+      setFieldError(this.lockTokenInput, 'Token address is required.');
+    } else if (!token) {
+      ok = false;
+      setFieldError(this.lockTokenInput, 'Enter a valid token address.');
+    }
+
+    const amount = Number(amountRaw || 0);
+    if (!amountRaw) {
+      ok = false;
+      setFieldError(this.lockAmountInput, 'Amount is required.');
+    } else if (!Number.isFinite(amount) || amount <= 0) {
+      ok = false;
+      setFieldError(this.lockAmountInput, 'Amount must be greater than 0.');
+    }
+
+    const cliffDays = Number(cliffRaw || 0);
+    if (cliffRaw && (!Number.isFinite(cliffDays) || cliffDays < 0)) {
+      ok = false;
+      setFieldError(this.lockCliffInput, 'Cliff must be 0 or more days.');
+    } else if (cliffRaw && !Number.isInteger(cliffDays)) {
+      ok = false;
+      setFieldError(this.lockCliffInput, 'Cliff must be a whole number of days.');
+    }
+
+    const durationDays = Number(durationRaw || 0);
+    if (!durationRaw) {
+      ok = false;
+      setFieldError(this.lockDurationInput, 'Vesting duration is required.');
+    } else if (!Number.isFinite(durationDays) || durationDays <= 0) {
+      ok = false;
+      setFieldError(this.lockDurationInput, 'Vesting duration must be at least 1 day.');
+    } else if (!Number.isInteger(durationDays)) {
+      ok = false;
+      setFieldError(this.lockDurationInput, 'Vesting duration must be a whole number of days.');
+    }
+
+    let ratePerDay = 0;
+    if (Number.isFinite(durationDays) && durationDays > 0) {
+      ratePerDay = Math.floor(RATE_SCALE / durationDays);
+      if (ratePerDay <= 0) {
+        ok = false;
+        setFieldError(this.lockDurationInput, 'Vesting duration is too long for a daily rate.');
+      }
+    }
+
+    let withdrawAddress = '';
+    if (withdrawRaw) {
+      withdrawAddress = this._normalizeAddress(withdrawRaw);
+      if (!withdrawAddress) {
+        ok = false;
+        setFieldError(this.lockWithdrawInput, 'Withdraw address is not valid.');
+      }
+    }
+
+    if (!ok) return { ok };
+    return {
+      ok,
+      values: {
+        token,
+        amount,
+        cliffDays,
+        durationDays,
+        ratePerDay,
+        withdrawAddress,
+      },
+    };
   }
 
   _clearLockTokenMeta() {

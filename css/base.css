@@ -951,6 +951,22 @@ textarea:focus-visible {
   padding: 10px 12px;
 }
 
+.field-message {
+  min-height: 14px;
+  font-size: var(--font-size-xs);
+  color: var(--danger-color);
+}
+
+.field--error .field-label {
+  color: var(--danger-color);
+}
+
+.field--error .field-input {
+  border-color: var(--danger-color);
+  background: #fff4f4;
+  box-shadow: 0 0 0 1px rgba(220, 53, 69, 0.12);
+}
+
 .field-readonly {
   min-height: 40px;
   display: flex;
