@@ -1,8 +1,8 @@
 import { CONFIG } from '../config.js';
+import { readTokenMetaCache, writeTokenMetaCache } from '../utils/token-meta-cache.js';
 import { extractErrorMessage, normalizeErrorMessage } from '../utils/transaction-helpers.js';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
-const TOKEN_META_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const HISTORY_CACHE_REORG_BUFFER = 20;
 
 export class HistoryTab {
@@ -359,7 +359,7 @@ export class HistoryTab {
       )
     ).forEach((addr) => {
       if (this._tokenMeta.has(addr)) return;
-      const cached = this._readTokenMetaCache(addr);
+      const cached = readTokenMetaCache(addr);
       if (cached) {
         this._tokenMeta.set(addr, cached);
         return;
@@ -375,7 +375,7 @@ export class HistoryTab {
           const meta = batchMap.get(addr);
           const resolved = meta || { symbol: '', decimals: 18 };
           this._tokenMeta.set(addr, resolved);
-          this._writeTokenMetaCache(addr, resolved);
+          writeTokenMetaCache(addr, resolved);
         });
         return;
       }
@@ -452,7 +452,7 @@ export class HistoryTab {
     const key = (token || '').toLowerCase();
     if (!key || key === ZERO_ADDRESS) return { symbol: '', decimals: 18 };
     if (this._tokenMeta.has(key)) return this._tokenMeta.get(key);
-    const cached = this._readTokenMetaCache(key);
+    const cached = readTokenMetaCache(key);
     if (cached) {
       this._tokenMeta.set(key, cached);
       return cached;
@@ -461,11 +461,11 @@ export class HistoryTab {
       const meta = await window.contractManager.getTokenMetadata(token);
       const resolved = meta || { symbol: '', decimals: 18 };
       this._tokenMeta.set(key, resolved);
-      this._writeTokenMetaCache(key, resolved);
+      writeTokenMetaCache(key, resolved);
     } catch {
       const fallback = { symbol: '', decimals: 18 };
       this._tokenMeta.set(key, fallback);
-      this._writeTokenMetaCache(key, fallback);
+      writeTokenMetaCache(key, fallback);
     }
     return this._tokenMeta.get(key);
   }
@@ -579,49 +579,6 @@ export class HistoryTab {
     }
   }
 
-  _getTokenMetaCacheKey(token) {
-    const chainId = Number(CONFIG?.NETWORK?.CHAIN_ID || 0);
-    const addr = String(token || '').toLowerCase();
-    if (!chainId || !addr || addr === ZERO_ADDRESS) return null;
-    return `liberdus_token_ui:token_meta:v1:${chainId}:${addr}`;
-  }
-
-  _readTokenMetaCache(token) {
-    const key = this._getTokenMetaCacheKey(token);
-    if (!key) return null;
-    try {
-      const raw = window.localStorage?.getItem(key);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return null;
-      if (parsed.expiresAt && Date.now() > parsed.expiresAt) {
-        window.localStorage?.removeItem(key);
-        return null;
-      }
-      const decimalsValue = Number(parsed.decimals);
-      return {
-        symbol: typeof parsed.symbol === 'string' ? parsed.symbol : '',
-        decimals: Number.isFinite(decimalsValue) ? decimalsValue : 18,
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  _writeTokenMetaCache(token, meta) {
-    const key = this._getTokenMetaCacheKey(token);
-    if (!key) return;
-    try {
-      const payload = {
-        symbol: typeof meta?.symbol === 'string' ? meta.symbol : '',
-        decimals: Number(meta?.decimals ?? 18),
-        expiresAt: Date.now() + TOKEN_META_CACHE_TTL_MS,
-      };
-      window.localStorage?.setItem(key, JSON.stringify(payload));
-    } catch {
-      // Ignore storage errors
-    }
-  }
 
   async _getBlockTime(provider, blockNumber) {
     if (this._blockTimeCache.has(blockNumber)) return this._blockTimeCache.get(blockNumber);

@@ -1,4 +1,5 @@
 import { CONFIG } from '../config.js';
+import { readTokenMetaCache, writeTokenMetaCache } from '../utils/token-meta-cache.js';
 import { extractErrorMessage, normalizeErrorMessage, formatTxMessage } from '../utils/transaction-helpers.js';
 
 const RATE_SCALE = 1_000_000_000_000;
@@ -541,10 +542,19 @@ export class LockActionToasts {
     }
     if (this._lockFormTokenMeta._token === normalized) return;
     try {
+      const cached = readTokenMetaCache(normalized);
+      if (cached) {
+        this._lockFormTokenMeta = { ...cached, _token: normalized };
+        this.lockDecimalsInput.textContent = cached.decimals == null ? '—' : String(cached.decimals);
+        this.lockSymbolInput.textContent = cached.symbol || '—';
+        return;
+      }
       const meta = await window.contractManager.getTokenMetadata(normalized);
-      this._lockFormTokenMeta = { ...(meta || { symbol: '', decimals: null }), _token: normalized };
-      this.lockDecimalsInput.textContent = meta?.decimals == null ? '—' : String(meta.decimals);
-      this.lockSymbolInput.textContent = meta?.symbol || '—';
+      const resolved = meta || { symbol: '', decimals: 18 };
+      this._lockFormTokenMeta = { ...resolved, _token: normalized };
+      this.lockDecimalsInput.textContent = resolved.decimals == null ? '—' : String(resolved.decimals);
+      this.lockSymbolInput.textContent = resolved.symbol || '—';
+      writeTokenMetaCache(normalized, resolved);
     } catch (err) {
       this._clearLockTokenMeta();
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Failed to load token metadata'));
@@ -647,8 +657,15 @@ export class LockActionToasts {
 
   async _ensureLockFormTokenMeta(token) {
     if (!this._lockFormTokenMeta || this._lockFormTokenMeta._token !== token) {
+      const cached = readTokenMetaCache(token);
+      if (cached) {
+        this._lockFormTokenMeta = { ...cached, _token: token };
+        return this._lockFormTokenMeta;
+      }
       const meta = await window.contractManager.getTokenMetadata(token);
-      this._lockFormTokenMeta = { ...(meta || { symbol: '', decimals: null }), _token: token };
+      const resolved = meta || { symbol: '', decimals: 18 };
+      this._lockFormTokenMeta = { ...resolved, _token: token };
+      writeTokenMetaCache(token, resolved);
       this.lockDecimalsInput.textContent = this._lockFormTokenMeta.decimals == null
         ? '—'
         : String(this._lockFormTokenMeta.decimals);
@@ -678,8 +695,15 @@ export class LockActionToasts {
 
   async _ensureTokenMeta(token) {
     if (!this._tokenMeta || this._tokenMeta._token !== token) {
+      const cached = readTokenMetaCache(token);
+      if (cached) {
+        this._tokenMeta = { ...cached, _token: token };
+        return this._tokenMeta;
+      }
       const meta = await window.contractManager.getTokenMetadata(token);
-      this._tokenMeta = { ...(meta || { symbol: '', decimals: 18 }), _token: token };
+      const resolved = meta || { symbol: '', decimals: 18 };
+      this._tokenMeta = { ...resolved, _token: token };
+      writeTokenMetaCache(token, resolved);
     }
     return this._tokenMeta;
   }
