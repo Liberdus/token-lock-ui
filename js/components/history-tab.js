@@ -1,6 +1,7 @@
 import { CONFIG } from '../config.js';
 import { readTokenMetaCache, writeTokenMetaCache } from '../utils/token-meta-cache.js';
 import { extractErrorMessage, normalizeErrorMessage } from '../utils/transaction-helpers.js';
+import { setFieldError, clearFieldError, clearFormErrors } from '../utils/form-validation.js';
 
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 const HISTORY_CACHE_REORG_BUFFER = 20;
@@ -50,18 +51,22 @@ export class HistoryTab {
               <label class="field">
                 <span class="field-label">From block</span>
                 <input class="field-input" data-history-from type="number" min="0" step="1" placeholder="0" />
+                <span class="field-message"></span>
               </label>
               <label class="field">
                 <span class="field-label">To block</span>
                 <input class="field-input" data-history-to type="number" min="0" step="1" placeholder="latest" />
+                <span class="field-message"></span>
               </label>
               <label class="field">
                 <span class="field-label">Creator filter</span>
                 <input class="field-input" data-history-creator placeholder="0x..." />
+                <span class="field-message"></span>
               </label>
               <label class="field">
                 <span class="field-label">Withdraw address filter</span>
                 <input class="field-input" data-history-withdraw placeholder="0x..." />
+                <span class="field-message"></span>
               </label>
               </div>
             </div>
@@ -91,6 +96,10 @@ export class HistoryTab {
     this.listEl = this.panel.querySelector('[data-history-list]');
 
     this.loadBtn?.addEventListener('click', () => this._loadHistory());
+    this.fromInput?.addEventListener('input', () => clearFieldError(this.fromInput));
+    this.toInput?.addEventListener('input', () => clearFieldError(this.toInput));
+    this.creatorInput?.addEventListener('input', () => clearFieldError(this.creatorInput));
+    this.withdrawInput?.addEventListener('input', () => clearFieldError(this.withdrawInput));
     this.panel?.addEventListener('click', (e) => this._handlePanelClick(e));
     this.mineInput?.addEventListener('change', () => {
       this._savePreferences();
@@ -126,21 +135,22 @@ export class HistoryTab {
   }
 
   async _loadHistory() {
+    const validation = this._validateHistoryForm();
+    if (!validation.ok) {
+      this._setStatus('Fix highlighted fields.');
+      return;
+    }
+
     try {
-      const fromBlock = Number(this.fromInput?.value || 0);
-      const toBlockRaw = (this.toInput?.value || '').trim();
-      const toBlock = toBlockRaw ? Number(toBlockRaw) : 'latest';
-      const creatorFilter = (this.creatorInput?.value || '').trim().toLowerCase();
-      const withdrawFilter = (this.withdrawInput?.value || '').trim().toLowerCase();
+      const {
+        fromBlock,
+        toBlock,
+        toBlockRaw,
+        creatorFilter,
+        withdrawFilter,
+      } = validation.values;
       const mineOnly = !!this.mineInput?.checked;
       const me = (window.walletManager?.getAddress?.() || '').toLowerCase();
-
-      if (!Number.isFinite(fromBlock) || fromBlock < 0) {
-        throw new Error('Invalid from block');
-      }
-      if (toBlock !== 'latest' && (!Number.isFinite(toBlock) || toBlock < fromBlock)) {
-        throw new Error('Invalid to block');
-      }
 
       const provider = window.contractManager.getReadContract()?.provider || window.contractManager.getProvider?.();
       const contract = window.contractManager.getReadContract();
@@ -212,6 +222,78 @@ export class HistoryTab {
       window.toastManager?.error(msg, { title: 'History load failed' });
       this._setStatus('Load failed.');
     }
+  }
+
+  _validateHistoryForm() {
+    clearFormErrors([this.fromInput, this.toInput, this.creatorInput, this.withdrawInput]);
+
+    const fromRaw = (this.fromInput?.value || '').trim();
+    const toRaw = (this.toInput?.value || '').trim();
+    const creatorRaw = (this.creatorInput?.value || '').trim();
+    const withdrawRaw = (this.withdrawInput?.value || '').trim();
+
+    let ok = true;
+
+    let fromBlock = 0;
+    if (fromRaw) {
+      const parsedFrom = Number(fromRaw);
+      if (!Number.isFinite(parsedFrom) || parsedFrom < 0 || !Number.isInteger(parsedFrom)) {
+        ok = false;
+        setFieldError(this.fromInput, 'From block must be a whole number ≥ 0.');
+      } else {
+        fromBlock = parsedFrom;
+      }
+    }
+
+    let toBlock = 'latest';
+    if (toRaw) {
+      const parsedTo = Number(toRaw);
+      if (!Number.isFinite(parsedTo) || parsedTo < 0 || !Number.isInteger(parsedTo)) {
+        ok = false;
+        setFieldError(this.toInput, 'To block must be a whole number ≥ 0.');
+      } else {
+        toBlock = parsedTo;
+      }
+    }
+
+    if (ok && toBlock !== 'latest' && Number.isFinite(fromBlock) && toBlock < fromBlock) {
+      ok = false;
+      setFieldError(this.toInput, 'To block must be greater than or equal to from block.');
+    }
+
+    let creatorFilter = creatorRaw.toLowerCase();
+    if (creatorRaw) {
+      const normalized = this._normalizeAddress(creatorRaw);
+      if (!normalized) {
+        ok = false;
+        setFieldError(this.creatorInput, 'Creator address is not valid.');
+      } else {
+        creatorFilter = normalized.toLowerCase();
+      }
+    }
+
+    let withdrawFilter = withdrawRaw.toLowerCase();
+    if (withdrawRaw) {
+      const normalized = this._normalizeAddress(withdrawRaw);
+      if (!normalized) {
+        ok = false;
+        setFieldError(this.withdrawInput, 'Withdraw address is not valid.');
+      } else {
+        withdrawFilter = normalized.toLowerCase();
+      }
+    }
+
+    if (!ok) return { ok };
+    return {
+      ok,
+      values: {
+        fromBlock,
+        toBlock,
+        toBlockRaw: toRaw,
+        creatorFilter,
+        withdrawFilter,
+      },
+    };
   }
 
   async _renderHistory(events, provider) {
@@ -597,6 +679,15 @@ export class HistoryTab {
     if (!s) return '—';
     if (s.length < 10) return s;
     return `${s.slice(0, 6)}…${s.slice(-4)}`;
+  }
+
+  _normalizeAddress(value) {
+    if (!value) return '';
+    try {
+      return window.ethers.utils.getAddress(value);
+    } catch {
+      return '';
+    }
   }
 
   _renderTxLink(txHash) {
