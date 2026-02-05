@@ -1,24 +1,42 @@
+const TOAST_TYPES = new Set(['success', 'error', 'warning', 'info', 'loading']);
+const TOAST_ICONS = {
+  success: '✓',
+  error: '✕',
+  warning: '⚠',
+  info: 'ℹ',
+  loading: '',
+};
+const FORM_TOAST_CLASS = 'notification--form';
+
 export class ToastManager {
-  constructor({ containerId = 'notification-container' } = {}) {
+  constructor({ containerId = 'notification-container', formContainerId = `${containerId}-form` } = {}) {
     this.containerId = containerId;
+    this.formContainerId = formContainerId;
     this.container = null;
-    this._toasts = new Map(); // id -> { el, timeoutId, showTimerId }
+    this.formContainer = null;
+    this._toasts = new Map(); // id -> { el, timeoutId, showTimerId, lane, type, className, pendingOptions }
     this._nextId = 1;
   }
 
   load() {
+    const appContainer = document.getElementById('app') || document.body;
+
     this.container = document.getElementById(this.containerId);
     if (!this.container) {
       this.container = document.createElement('div');
       this.container.id = this.containerId;
-      // Append to #app container (for relative positioning)
-      const appContainer = document.getElementById('app');
-      (appContainer || document.body).appendChild(this.container);
+      appContainer.appendChild(this.container);
     }
 
-    this.container.classList.add('notification-container');
-    this.container.setAttribute('aria-live', 'polite');
-    this.container.setAttribute('aria-relevant', 'additions');
+    this.formContainer = document.getElementById(this.formContainerId);
+    if (!this.formContainer) {
+      this.formContainer = document.createElement('div');
+      this.formContainer.id = this.formContainerId;
+      appContainer.appendChild(this.formContainer);
+    }
+
+    this._configureContainer(this.container, 'ephemeral');
+    this._configureContainer(this.formContainer, 'form');
   }
 
   show({ title, message, type = 'info', timeoutMs, id, dismissible = true, delayMs = 0, allowHtml = false, className = '' } = {}) {
@@ -30,25 +48,20 @@ export class ToastManager {
       return toastId;
     }
 
+    const nextType = this._normalizeType(type);
+    const nextClassName = this._normalizeClassName(className);
+    const lane = this._getLaneForClassName(nextClassName);
+    const options = { title, message, type: nextType, timeoutMs, dismissible, allowHtml, className: nextClassName };
+
     const create = () => {
       const el = document.createElement('div');
-      const extraClass = className ? ` ${className}` : '';
-      el.className = `notification ${type}${extraClass}`;
+      el.className = this._buildNotificationClassName(nextType, nextClassName);
       el.setAttribute('data-toast-id', toastId);
-      el.setAttribute('role', type === 'error' ? 'alert' : 'status');
+      el.setAttribute('role', nextType === 'error' ? 'alert' : 'status');
 
-      // Icon based on type
-      const iconMap = {
-        success: '✓',
-        error: '✕',
-        warning: '⚠',
-        info: 'ℹ',
-        loading: '', // Loading uses CSS spinner instead of character
-      };
-      const icon = iconMap[type] || 'ℹ';
-
+      const icon = nextType === 'loading' ? '<span class="spinner"></span>' : (TOAST_ICONS[nextType] || TOAST_ICONS.info);
       el.innerHTML = `
-        <div class="notification-icon" aria-hidden="true">${type === 'loading' ? '<span class="spinner"></span>' : icon}</div>
+        <div class="notification-icon" aria-hidden="true">${icon}</div>
         <div class="notification-content">
           ${title ? `<div class="notification-title"></div>` : ''}
           <div class="notification-message"></div>
@@ -69,11 +82,11 @@ export class ToastManager {
       const closeBtn = el.querySelector('.notification-close');
       closeBtn?.addEventListener('click', () => this.dismiss(toastId));
 
-      this.container.appendChild(el);
+      this._insertToast(el, lane);
       // Trigger entry animation (match lib-lp-staking-frontend style).
       requestAnimationFrame(() => el.classList.add('show'));
 
-      const rec = { el, timeoutId: null, showTimerId: null };
+      const rec = { el, timeoutId: null, showTimerId: null, lane, type: nextType, className: nextClassName, pendingOptions: null };
       this._toasts.set(toastId, rec);
 
       if (typeof timeoutMs === 'number' && timeoutMs > 0) {
@@ -83,7 +96,15 @@ export class ToastManager {
 
     if (delayMs && delayMs > 0) {
       const showTimerId = window.setTimeout(create, delayMs);
-      this._toasts.set(toastId, { el: null, timeoutId: null, showTimerId });
+      this._toasts.set(toastId, {
+        el: null,
+        timeoutId: null,
+        showTimerId,
+        lane,
+        type: nextType,
+        className: nextClassName,
+        pendingOptions: options,
+      });
     } else {
       create();
     }
@@ -104,7 +125,7 @@ export class ToastManager {
     return this.show({ id, title, message, type: 'error', timeoutMs, dismissible: true, allowHtml });
   }
 
-  update(id, { title, message, type, timeoutMs, dismissible, allowHtml = false, className = '' } = {}) {
+  update(id, { title, message, type, timeoutMs, dismissible, allowHtml, className } = {}) {
     const rec = this._toasts.get(id);
     if (!rec) return false;
 
@@ -112,45 +133,59 @@ export class ToastManager {
     if (!rec.el && rec.showTimerId) {
       window.clearTimeout(rec.showTimerId);
       this._toasts.delete(id);
-      this.show({ id, title, message, type, timeoutMs, dismissible, delayMs: 0, allowHtml, className });
+      const pending = rec.pendingOptions || {};
+      this.show({
+        id,
+        title: title !== undefined ? title : pending.title,
+        message: message !== undefined ? message : pending.message,
+        type: type !== undefined ? type : pending.type,
+        timeoutMs: timeoutMs !== undefined ? timeoutMs : pending.timeoutMs,
+        dismissible: dismissible !== undefined ? dismissible : pending.dismissible,
+        delayMs: 0,
+        allowHtml: allowHtml !== undefined ? allowHtml : pending.allowHtml,
+        className: className !== undefined ? className : pending.className,
+      });
       return true;
     }
 
     const el = rec.el;
     if (!el) return false;
 
-    if (type || className) {
-      const extraClass = className ? ` ${className}` : '';
-      const nextType = type || el.className.split(' ').find((c) => c !== 'notification' && c !== className) || 'info';
-      // Preserve the 'show' class to maintain visibility
+    if (type !== undefined || className !== undefined) {
+      const nextType = type !== undefined ? this._normalizeType(type) : rec.type;
+      const nextClassName = className !== undefined ? this._normalizeClassName(className) : rec.className;
+      const nextLane = this._getLaneForClassName(nextClassName);
       const hasShow = el.classList.contains('show');
-      el.className = `notification ${nextType}${extraClass}${hasShow ? ' show' : ''}`;
-      el.setAttribute('role', type === 'error' ? 'alert' : 'status');
-      // Update icon
-      const iconMap = {
-        success: '✓',
-        error: '✕',
-        warning: '⚠',
-        info: 'ℹ',
-        loading: '',
-      };
+      el.className = this._buildNotificationClassName(nextType, nextClassName, { includeShow: hasShow });
+      el.setAttribute('role', nextType === 'error' ? 'alert' : 'status');
       const iconEl = el.querySelector('.notification-icon');
-      if (iconEl) {
-        if (type === 'loading') {
-          iconEl.innerHTML = '<span class="spinner"></span>';
-        } else {
-          iconEl.textContent = iconMap[type] || 'ℹ';
-        }
+      this._setToastIcon(iconEl, nextType);
+
+      if (rec.lane !== nextLane) {
+        this._insertToast(el, nextLane);
       }
+
+      rec.type = nextType;
+      rec.className = nextClassName;
+      rec.lane = nextLane;
     }
     if (typeof title === 'string') {
-      const titleEl = el.querySelector('.notification-title');
+      let titleEl = el.querySelector('.notification-title');
+      if (!titleEl) {
+        const contentEl = el.querySelector('.notification-content');
+        if (contentEl) {
+          titleEl = document.createElement('div');
+          titleEl.className = 'notification-title';
+          contentEl.prepend(titleEl);
+        }
+      }
       if (titleEl) titleEl.textContent = title;
     }
     if (typeof message === 'string') {
       const msgEl = el.querySelector('.notification-message');
+      const shouldAllowHtml = typeof allowHtml === 'boolean' ? allowHtml : false;
       if (msgEl) {
-        if (allowHtml) {
+        if (shouldAllowHtml) {
           msgEl.innerHTML = this._sanitizeMessageHtml(message);
         } else {
           msgEl.textContent = message;
@@ -179,6 +214,59 @@ export class ToastManager {
     }
 
     return true;
+  }
+
+  _configureContainer(container, lane) {
+    if (!container) return;
+
+    container.classList.add('notification-container');
+    container.classList.remove('notification-container--ephemeral', 'notification-container--form');
+    container.classList.add(`notification-container--${lane}`);
+    container.setAttribute('aria-live', 'polite');
+    container.setAttribute('aria-relevant', 'additions');
+  }
+
+  _normalizeType(type) {
+    const value = String(type || '').trim();
+    return TOAST_TYPES.has(value) ? value : 'info';
+  }
+
+  _normalizeClassName(className) {
+    return String(className || '').trim().replace(/\s+/g, ' ');
+  }
+
+  _getLaneForClassName(className) {
+    if (!className) return 'ephemeral';
+    const classes = className.split(' ').filter(Boolean);
+    return classes.includes(FORM_TOAST_CLASS) ? 'form' : 'ephemeral';
+  }
+
+  _buildNotificationClassName(type, className, { includeShow = false } = {}) {
+    const classes = ['notification', this._normalizeType(type)];
+    if (className) classes.push(...this._normalizeClassName(className).split(' '));
+    if (includeShow) classes.push('show');
+    return Array.from(new Set(classes)).join(' ');
+  }
+
+  _insertToast(el, lane) {
+    const target = lane === 'form' ? this.formContainer : this.container;
+    if (!target) return;
+
+    if (lane === 'ephemeral') {
+      target.prepend(el);
+    } else {
+      target.appendChild(el);
+    }
+  }
+
+  _setToastIcon(iconEl, type) {
+    if (!iconEl) return;
+    const nextType = this._normalizeType(type);
+    if (nextType === 'loading') {
+      iconEl.innerHTML = '<span class="spinner"></span>';
+      return;
+    }
+    iconEl.textContent = TOAST_ICONS[nextType] || TOAST_ICONS.info;
   }
 
   _sanitizeMessageHtml(message) {

@@ -6,10 +6,7 @@
 /* Container */
 .notification-container {
   position: fixed;
-  top: 24px;
   left: 50%;
-  transform: translate(-50%, 0);
-  z-index: 1000004;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -23,6 +20,16 @@
   backface-visibility: hidden;
   -webkit-perspective: 1000;
   perspective: 1000;
+}
+
+.notification-container--ephemeral {
+  top: 24px;
+  z-index: 1000005;
+}
+
+.notification-container--form {
+  top: 24px;
+  z-index: 1000004;
 }
 
 /* Notification Card */
@@ -243,11 +250,15 @@
 /* Responsive - Mobile */
 @media (max-width: 480px) {
   .notification-container {
-    top: 16px;
     left: 50%;
     width: calc(100% - 24px);
     max-width: none;
     padding: 0;
+  }
+
+  .notification-container--ephemeral,
+  .notification-container--form {
+    top: 16px;
   }
 
   .notification.notification--form {
