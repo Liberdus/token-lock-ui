@@ -1,0 +1,16 @@
+{
+  "name": "token-lock-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test:e2e": "node scripts/test-e2e.js",
+    "test:e2e:headed": "node scripts/test-e2e.js --headed",
+    "playwright:test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "ethers": "^6.16.0",
+    "wait-on": "^7.2.0"
+  }
+}
