@@ -175,6 +175,8 @@ export class LockActionToasts {
     this.lockDurationInput = root.querySelector('[data-lock-duration]');
     this.lockRatePctInput = root.querySelector('[data-lock-rate-pct]');
     this.lockWithdrawInput = root.querySelector('[data-lock-withdraw]');
+    this.lockRetractDisableUnlockInput = root.querySelector('[data-lock-retract-disable-unlock]');
+    this.lockRetractDisableWithdrawInput = root.querySelector('[data-lock-retract-disable-withdraw]');
     this.lockSubmitBtn = root.querySelector('[data-lock-submit]');
 
     if (this._lockFormTokenMetaTimer) {
@@ -183,10 +185,20 @@ export class LockActionToasts {
     }
     this._clearLockTokenMeta();
     this._updateLockRate();
+    this._lockRetractPolicyTouched = false;
+    this._lockRetractPolicyApplying = false;
+    this._lockWithdrawTouched = false;
 
     this.lockDurationInput?.addEventListener('input', () => this._updateLockRate());
     this.lockTokenInput?.addEventListener('input', () => this._scheduleLockTokenMetaLoad());
     this.lockTokenInput?.addEventListener('blur', () => this._loadLockTokenMeta());
+    this.lockWithdrawInput?.addEventListener('input', () => {
+      this._lockWithdrawTouched = true;
+      this._applyRetractDisableDefault();
+    });
+    this.lockRetractDisableUnlockInput?.addEventListener('change', () => this._handleRetractDisableUnlockChange());
+    this.lockRetractDisableWithdrawInput?.addEventListener('change', () => this._handleRetractDisableWithdrawChange());
+    this._applyRetractDisableDefault({ force: true });
     this.lockSubmitBtn?.addEventListener('click', () => this._submitLock());
   }
 
@@ -292,6 +304,19 @@ export class LockActionToasts {
           <span class="field-label">Withdraw Address (optional)</span>
           <input class="field-input" data-lock-withdraw placeholder="Defaults to your wallet" />
         </label>
+        <div class="field field--full">
+          <span class="field-label">Disable retract after</span>
+          <div class="field-options">
+            <label class="field-option">
+              <input type="checkbox" data-lock-retract-disable-unlock />
+              <span>Unlock</span>
+            </label>
+            <label class="field-option">
+              <input type="checkbox" data-lock-retract-disable-withdraw />
+              <span>First withdraw</span>
+            </label>
+          </div>
+        </div>
       </div>
       <div class="actions">
         <button type="button" class="btn btn--primary" data-lock-submit>Lock</button>
@@ -573,6 +598,10 @@ export class LockActionToasts {
         ? Math.floor(RATE_SCALE / durationDays)
         : 0;
       const withdrawAddress = (this.lockWithdrawInput?.value || '').trim();
+      let retractUntilUnlock = !!this.lockRetractDisableUnlockInput?.checked;
+      if (!retractUntilUnlock && !this.lockRetractDisableWithdrawInput?.checked) {
+        retractUntilUnlock = false;
+      }
 
       if (!token) throw new Error('Token address required');
       if (!amount || amount <= 0) throw new Error('Amount must be > 0');
@@ -630,6 +659,7 @@ export class LockActionToasts {
           cliffDays: Math.floor(cliffDays),
           ratePerDay,
           withdrawAddress: withdrawAddress || ZERO_ADDRESS,
+          retractUntilUnlock,
         });
         const receipt = await tx.wait();
         window.toastManager?.update(lockToastId, {
@@ -678,6 +708,60 @@ export class LockActionToasts {
     this._lockFormTokenMeta = { symbol: '', decimals: null, _token: '' };
     if (this.lockDecimalsInput) this.lockDecimalsInput.textContent = '—';
     if (this.lockSymbolInput) this.lockSymbolInput.textContent = '—';
+  }
+
+  _handleRetractDisableUnlockChange() {
+    if (this._lockRetractPolicyApplying) return;
+    this._lockRetractPolicyTouched = true;
+    const checked = !!this.lockRetractDisableUnlockInput?.checked;
+    this._lockRetractPolicyApplying = true;
+    if (this.lockRetractDisableWithdrawInput) {
+      this.lockRetractDisableWithdrawInput.checked = !checked;
+    }
+    this._lockRetractPolicyApplying = false;
+  }
+
+  _handleRetractDisableWithdrawChange() {
+    if (this._lockRetractPolicyApplying) return;
+    this._lockRetractPolicyTouched = true;
+    const checked = !!this.lockRetractDisableWithdrawInput?.checked;
+    this._lockRetractPolicyApplying = true;
+    if (this.lockRetractDisableUnlockInput) {
+      this.lockRetractDisableUnlockInput.checked = !checked;
+    }
+    this._lockRetractPolicyApplying = false;
+  }
+
+  _applyRetractDisableDefault({ force = false } = {}) {
+    if (!this.lockRetractDisableUnlockInput || !this.lockRetractDisableWithdrawInput) return;
+    if (this._lockRetractPolicyTouched && !force) return;
+
+    const rawWithdraw = (this.lockWithdrawInput?.value || '').trim();
+    const normalizedWithdraw = rawWithdraw ? this._normalizeAddress(rawWithdraw) : '';
+    if (rawWithdraw && !normalizedWithdraw) return;
+
+    const creator = this._getCurrentAddress();
+    let sameAsCreator = false;
+    if (normalizedWithdraw) {
+      sameAsCreator = !!creator && normalizedWithdraw.toLowerCase() === creator;
+    } else {
+      sameAsCreator = !!creator;
+    }
+
+    if (this._lockWithdrawTouched && normalizedWithdraw && sameAsCreator) return;
+
+    this._setRetractDisableSelection({ preferUnlock: sameAsCreator });
+  }
+
+  _setRetractDisableSelection({ preferUnlock } = {}) {
+    this._lockRetractPolicyApplying = true;
+    if (this.lockRetractDisableUnlockInput) this.lockRetractDisableUnlockInput.checked = !!preferUnlock;
+    if (this.lockRetractDisableWithdrawInput) this.lockRetractDisableWithdrawInput.checked = !preferUnlock;
+    this._lockRetractPolicyApplying = false;
+  }
+
+  _getCurrentAddress() {
+    return (window.walletManager?.getAddress?.() || '').toLowerCase();
   }
 
   _normalizeAddress(value) {

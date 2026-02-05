@@ -841,6 +841,7 @@ export class OverviewTab {
   _getRetractUnavailableReason(lock) {
     if (!lock) return 'Lock not found.';
     if (!this._isCreator(lock)) return 'Only the lock creator can retract.';
+    if (lock.retractUntilUnlock && lock.unlocked) return 'Cannot retract after unlock.';
     const withdrawnRaw = lock.withdrawn?.toString?.() ?? lock.withdrawn ?? 0;
     if (!this._isZeroAmount(withdrawnRaw)) return 'Cannot retract after withdrawals have occurred.';
     return '';

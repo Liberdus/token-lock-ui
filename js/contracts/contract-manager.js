@@ -201,10 +201,22 @@ export class ContractManager {
     return await Promise.all(ids.map(async (id) => this.previewWithdrawable(id).catch(() => null)));
   }
 
-  async lock({ token, amount, cliffDays, ratePerDay, withdrawAddress }) {
+  async lock({
+    token,
+    amount,
+    cliffDays,
+    ratePerDay,
+    withdrawAddress,
+    retractUntilUnlock = false,
+  }) {
     const contract = this.getWriteContract();
     if (!contract) throw new Error('Wallet not connected');
-    return contract.lock(token, amount, cliffDays, ratePerDay, withdrawAddress);
+    const args = [token, amount, cliffDays, ratePerDay, withdrawAddress];
+    const fn = contract?.interface?.getFunction?.('lock');
+    if (fn && Array.isArray(fn.inputs) && fn.inputs.length >= 6) {
+      args.push(!!retractUntilUnlock);
+    }
+    return contract.lock(...args);
   }
 
   async unlock({ lockId, unlockTime }) {

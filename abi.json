@@ -346,6 +346,11 @@
             "internalType": "bool",
             "name": "unlocked",
             "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "retractUntilUnlock",
+            "type": "bool"
           }
         ],
         "internalType": "struct TokenLock.Lock",
@@ -382,6 +387,11 @@
         "internalType": "address",
         "name": "withdrawAddress",
         "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "retractUntilUnlock",
+        "type": "bool"
       }
     ],
     "name": "lock",
