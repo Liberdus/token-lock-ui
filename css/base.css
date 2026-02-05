@@ -780,8 +780,11 @@ textarea:focus-visible {
 .btn--looks-disabled:not(:disabled),
 .btn[aria-disabled="true"]:not(:disabled) {
   cursor: pointer;
-  opacity: 0.55;
-  filter: saturate(0.35);
+  background: var(--button-hover-background);
+  border-color: var(--border-color);
+  color: var(--button-text);
+  opacity: 1;
+  filter: none;
 }
 
 .btn--looks-disabled:active:not(:disabled),
@@ -791,26 +794,29 @@ textarea:focus-visible {
 
 .btn.btn--looks-disabled:hover:not(:disabled),
 .btn[aria-disabled="true"]:hover:not(:disabled) {
-  background: var(--button-background);
+  background: var(--button-hover-background);
   border-color: var(--border-color);
 }
 
 .btn--primary.btn--looks-disabled:hover:not(:disabled),
 .btn--primary[aria-disabled="true"]:hover:not(:disabled) {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
+  background: var(--button-hover-background);
+  border-color: var(--border-color);
+  color: var(--button-text);
 }
 
 .btn--danger.btn--looks-disabled:hover:not(:disabled),
 .btn--danger[aria-disabled="true"]:hover:not(:disabled) {
-  background: var(--danger-color);
-  border-color: var(--danger-color);
+  background: var(--button-hover-background);
+  border-color: var(--border-color);
+  color: var(--button-text);
 }
 
 .btn--success.btn--looks-disabled:hover:not(:disabled),
 .btn--success[aria-disabled="true"]:hover:not(:disabled) {
-  background: var(--success-color);
-  border-color: var(--success-color);
+  background: var(--button-hover-background);
+  border-color: var(--border-color);
+  color: var(--button-text);
 }
 
 .btn--icon {
