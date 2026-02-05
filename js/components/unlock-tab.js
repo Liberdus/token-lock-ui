@@ -576,8 +576,9 @@ export class LockActionToasts {
   }
 
   _updateLockRate() {
-    const duration = Number(this.lockDurationInput?.value || 0);
-    if (!Number.isFinite(duration) || duration <= 0) {
+    const durationRaw = (this.lockDurationInput?.value || '').trim();
+    const duration = Number(durationRaw);
+    if (!durationRaw || !Number.isFinite(duration) || duration <= 0) {
       if (this.lockRatePctInput) this.lockRatePctInput.textContent = '—';
       return;
     }
@@ -860,8 +861,12 @@ export class LockActionToasts {
       setFieldError(this.lockTokenInput, 'Enter a valid token address.');
     }
 
-    const amount = Number(amountRaw || 0);
-    if (!amountRaw) {
+    const amountBad = !!this.lockAmountInput?.validity?.badInput || amountRaw === '-' || amountRaw === '+';
+    const amount = Number(amountRaw);
+    if (amountBad) {
+      ok = false;
+      setFieldError(this.lockAmountInput, 'Enter a valid amount.');
+    } else if (!amountRaw) {
       ok = false;
       setFieldError(this.lockAmountInput, 'Amount is required.');
     } else if (!Number.isFinite(amount) || amount <= 0) {
@@ -869,17 +874,31 @@ export class LockActionToasts {
       setFieldError(this.lockAmountInput, 'Amount must be greater than 0.');
     }
 
-    const cliffDays = Number(cliffRaw || 0);
-    if (cliffRaw && (!Number.isFinite(cliffDays) || cliffDays < 0)) {
+    const cliffBad = !!this.lockCliffInput?.validity?.badInput || cliffRaw === '-' || cliffRaw === '+';
+    let cliffDays = 0;
+    if (cliffBad) {
       ok = false;
-      setFieldError(this.lockCliffInput, 'Cliff must be 0 or more days.');
-    } else if (cliffRaw && !Number.isInteger(cliffDays)) {
+      setFieldError(this.lockCliffInput, 'Cliff must be a whole number ≥ 0.');
+    } else if (!cliffRaw) {
       ok = false;
-      setFieldError(this.lockCliffInput, 'Cliff must be a whole number of days.');
+      setFieldError(this.lockCliffInput, 'Cliff is required (use 0 if none).');
+    } else {
+      cliffDays = Number(cliffRaw);
+      if (!Number.isFinite(cliffDays) || cliffDays < 0) {
+        ok = false;
+        setFieldError(this.lockCliffInput, 'Cliff must be 0 or more days.');
+      } else if (!Number.isInteger(cliffDays)) {
+        ok = false;
+        setFieldError(this.lockCliffInput, 'Cliff must be a whole number of days.');
+      }
     }
 
-    const durationDays = Number(durationRaw || 0);
-    if (!durationRaw) {
+    const durationBad = !!this.lockDurationInput?.validity?.badInput || durationRaw === '-' || durationRaw === '+';
+    const durationDays = Number(durationRaw);
+    if (durationBad) {
+      ok = false;
+      setFieldError(this.lockDurationInput, 'Vesting duration must be a whole number of days.');
+    } else if (!durationRaw) {
       ok = false;
       setFieldError(this.lockDurationInput, 'Vesting duration is required.');
     } else if (!Number.isFinite(durationDays) || durationDays <= 0) {
