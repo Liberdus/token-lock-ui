@@ -737,6 +737,22 @@ textarea:focus-visible {
   opacity: 0.6;
 }
 
+.footer-link {
+  font-size: var(--font-size-sm);
+  color: var(--secondary-text-color);
+  text-decoration: none;
+  padding: 4px 2px;
+}
+
+.footer-link:hover {
+  color: var(--primary-color);
+  text-decoration: underline;
+}
+
+.footer-action {
+  margin-left: auto;
+}
+
 .btn--footer {
   font-size: var(--font-size-sm);
   padding: 4px 8px;

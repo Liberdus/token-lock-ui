@@ -85,6 +85,11 @@ export class OverviewTab {
     this.refreshLocks();
   }
 
+  clearLocalCache() {
+    this._tokenMeta.clear();
+    this._tokens.clear();
+  }
+
   _bind() {
     this.locksListEl = this.panel.querySelector('[data-locks-list]');
     this.refreshBtn = this.panel.querySelector('[data-overview-refresh]');

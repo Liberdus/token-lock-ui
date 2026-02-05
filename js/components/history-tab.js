@@ -28,6 +28,11 @@ export class HistoryTab {
     });
   }
 
+  clearLocalCache() {
+    this._tokenMeta.clear();
+    this._blockTimeCache.clear();
+  }
+
   _init() {
     if (this._loaded) return;
     this._loaded = true;

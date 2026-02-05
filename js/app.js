@@ -24,6 +24,33 @@ const networkManager = new NetworkManager({ walletManager });
 const walletPopup = new WalletPopup({ walletManager, networkManager });
 const contractManager = new ContractManager({ walletManager, networkManager });
 
+const CACHE_PREFIXES = [
+  'liberdus_token_ui:token_meta:v1:',
+  'liberdus_token_ui:history:cache:v1:',
+];
+
+function clearLocalCaches() {
+  let removed = 0;
+  try {
+    const storage = window.localStorage;
+    if (!storage) return removed;
+    const keys = [];
+    for (let i = 0; i < storage.length; i += 1) {
+      const key = storage.key(i);
+      if (key) keys.push(key);
+    }
+    keys.forEach((key) => {
+      if (CACHE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+        storage.removeItem(key);
+        removed += 1;
+      }
+    });
+  } catch {
+    return removed;
+  }
+  return removed;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   // Basic config exposure (helpful during dev)
   window.CONFIG = CONFIG;
@@ -62,6 +89,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   const openLockActionBtn = document.getElementById('open-lock-action-btn');
   openLockActionBtn?.addEventListener('click', () => {
     window.lockActionToasts?.openLockToast?.();
+  });
+
+  const clearCacheLink = document.getElementById('app-clear-cache');
+  clearCacheLink?.addEventListener('click', (event) => {
+    event.preventDefault();
+    const removed = clearLocalCaches();
+    window.overviewTab?.clearLocalCache?.();
+    window.historyTab?.clearLocalCache?.();
+    window.lockActionToasts?.clearLocalCache?.();
+    const message = removed > 0
+      ? `Cleared ${removed} cached item${removed === 1 ? '' : 's'}.`
+      : 'No cached data to clear.';
+    window.toastManager?.success(message, { title: 'Cache', timeoutMs: 2500 });
   });
 
   // Load TabBar last so the initial `tabActivated` event

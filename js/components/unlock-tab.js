@@ -19,6 +19,15 @@ export class LockActionToasts {
     // No-op: actions are triggered via toasts on the Overview list.
   }
 
+  clearLocalCache() {
+    if (this._lockFormTokenMetaTimer) {
+      clearTimeout(this._lockFormTokenMetaTimer);
+      this._lockFormTokenMetaTimer = null;
+    }
+    this._tokenMeta = { symbol: '', decimals: 18 };
+    this._lockFormTokenMeta = { symbol: '', decimals: null, _token: '' };
+  }
+
   openUnlockToast({ lockId } = {}) {
     const message = this._renderUnlockFormHtml();
     const id = window.toastManager?.show?.({
