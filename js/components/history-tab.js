@@ -143,12 +143,12 @@ export class HistoryTab {
       const eventTopic = iface.getEventTopic('LockClosed');
       const latest = toBlock === 'latest' ? await provider.getBlockNumber() : toBlock;
 
-      const chunk = 5000;
+      const chunk = 3000;
       const events = [];
       for (let start = fromBlock; start <= latest; start += chunk + 1) {
         const end = Math.min(latest, start + chunk);
         this._setStatus(`Scanning blocks ${start} - ${end}...`);
-        const logs = await provider.getLogs({
+        const logs = await this._getLogsWithRetry(provider, {
           address: CONFIG.CONTRACT.ADDRESS,
           fromBlock: start,
           toBlock: end,
@@ -174,6 +174,8 @@ export class HistoryTab {
             // ignore
           }
         }
+        // Small pause between chunks to reduce burst pressure on public RPCs.
+        await this._sleep(120);
       }
 
       await this._renderHistory(events, provider);
@@ -195,15 +197,23 @@ export class HistoryTab {
     // Sort newest first (by block)
     events.sort((a, b) => b.blockNumber - a.blockNumber);
 
+    await this._primeTokenMetadata(events);
+    const uniqueBlocks = Array.from(
+      new Set(events.map((e) => Number(e.blockNumber)).filter((n) => Number.isFinite(n) && n >= 0))
+    );
+    await this._prefetchBlockTimes(provider, uniqueBlocks, 2);
+
     const rows = [];
     for (const e of events) {
       const tokenAddr = String(e.token);
       const creator = String(e.creator || '');
       const withdrawAddress = String(e.withdrawAddress || '');
       const txHash = String(e.txHash || '');
-      const meta = await this._getTokenMeta(tokenAddr);
+      const tokenKey = tokenAddr.toLowerCase();
+      const meta = this._tokenMeta.get(tokenKey) || (await this._getTokenMeta(tokenAddr));
       const fmt = (v) => window.ethers.utils.formatUnits(v || 0, meta.decimals || 18);
-      const closedAt = await this._getBlockTime(provider, e.blockNumber);
+      const cachedClosedAt = this._blockTimeCache.get(e.blockNumber);
+      const closedAt = cachedClosedAt == null ? await this._getBlockTime(provider, e.blockNumber) : cachedClosedAt;
       const reason = Number(e.reason) === 0 ? 'Withdrawn' : 'Retracted';
       const unlockTime = Number(e.unlockTime || 0);
 
@@ -288,6 +298,94 @@ export class HistoryTab {
     }
 
     this.listEl.innerHTML = rows.join('');
+  }
+
+  async _primeTokenMetadata(events = []) {
+    const pending = Array.from(
+      new Set(
+        (events || [])
+          .map((e) => String(e?.token || '').toLowerCase())
+          .filter((addr) => addr && addr !== ZERO_ADDRESS && !this._tokenMeta.has(addr))
+      )
+    );
+    if (!pending.length) return;
+
+    try {
+      const batchMap = await window.contractManager?.getTokenMetadataBatch?.(pending);
+      if (batchMap instanceof Map) {
+        pending.forEach((addr) => {
+          const meta = batchMap.get(addr);
+          this._tokenMeta.set(addr, meta || { symbol: '', decimals: 18 });
+        });
+        return;
+      }
+    } catch {
+      // Fall through to per-token fallback.
+    }
+
+    await Promise.all(pending.map(async (addr) => this._getTokenMeta(addr)));
+  }
+
+  async _prefetchBlockTimes(provider, blockNumbers = [], maxConcurrent = 4) {
+    if (!provider) return;
+    const pending = Array.from(
+      new Set((blockNumbers || []).map((v) => Number(v)).filter((n) => Number.isFinite(n) && n >= 0))
+    ).filter((n) => !this._blockTimeCache.has(n));
+    if (!pending.length) return;
+
+    const concurrency = Math.max(1, Math.min(Number(maxConcurrent) || 1, pending.length));
+    let index = 0;
+
+    const worker = async () => {
+      while (index < pending.length) {
+        const i = index;
+        index += 1;
+        const blockNumber = pending[i];
+        try {
+          const block = await provider.getBlock(blockNumber);
+          this._blockTimeCache.set(blockNumber, block?.timestamp || 0);
+        } catch {
+          this._blockTimeCache.set(blockNumber, 0);
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: concurrency }, () => worker()));
+  }
+
+  async _getLogsWithRetry(provider, filter, { maxRetries = 4, baseDelayMs = 400 } = {}) {
+    let attempt = 0;
+    while (true) {
+      try {
+        return await provider.getLogs(filter);
+      } catch (err) {
+        const retryable = this._isRateLimitError(err);
+        if (!retryable || attempt >= maxRetries) throw err;
+        const waitMs = baseDelayMs * (2 ** attempt) + Math.floor(Math.random() * 120);
+        this._setStatus(`Rate limited. Retrying in ${Math.ceil(waitMs / 1000)}s...`);
+        await this._sleep(waitMs);
+        attempt += 1;
+      }
+    }
+  }
+
+  _isRateLimitError(err) {
+    const text = String(err?.message || err?.reason || err || '').toLowerCase();
+    return (
+      text.includes('429') ||
+      text.includes('rate limit') ||
+      text.includes('too many requests') ||
+      text.includes('request limit') ||
+      text.includes('throttl')
+    );
+  }
+
+  async _sleep(ms) {
+    const delay = Math.max(0, Number(ms) || 0);
+    if (!delay) return;
+    await new Promise((resolve) => {
+      setTimeout(resolve, delay);
+    });
   }
 
   async _getTokenMeta(token) {

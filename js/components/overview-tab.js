@@ -27,7 +27,7 @@ export class OverviewTab {
             <h2>Active Locks</h2>
             <button type="button" class="btn btn--ghost btn--footer" data-overview-refresh>Refresh</button>
           </div>
-          <p class="muted">All locks ordered by oldest unlock time.</p>
+          <p class="muted">All locks ordered by newest first.</p>
         </div>
 
         <div class="lock-filters">
@@ -291,11 +291,9 @@ export class OverviewTab {
     }
 
     rows.sort((a, b) => {
-      const at = Number(a.lock.unlockTime?.toString?.() ?? a.lock.unlockTime ?? 0);
-      const bt = Number(b.lock.unlockTime?.toString?.() ?? b.lock.unlockTime ?? 0);
-      const aKey = at > 0 ? at : Number.MAX_SAFE_INTEGER;
-      const bKey = bt > 0 ? bt : Number.MAX_SAFE_INTEGER;
-      return aKey - bKey;
+      const aId = Number(a.id || 0);
+      const bId = Number(b.id || 0);
+      return bId - aId;
     });
 
     const total = rows.length;
