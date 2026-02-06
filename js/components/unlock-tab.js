@@ -13,6 +13,9 @@ export class LockActionToasts {
     this._tokenMeta = { symbol: '', decimals: 18 };
     this._lockFormTokenMeta = { symbol: '', decimals: null, _token: '' };
     this._lockFormTokenMetaTimer = null;
+    this._withdrawAvailable = null;
+    this._withdrawInputSource = null;
+    this._withdrawSyncing = false;
   }
 
   load() {
@@ -83,6 +86,9 @@ export class LockActionToasts {
     this._activeWithdrawLockId = Number.isFinite(numericLockId) ? numericLockId : null;
     this._lock = null;
     this._tokenMeta = { symbol: '', decimals: 18 };
+    this._withdrawAvailable = null;
+    this._withdrawInputSource = null;
+    this._withdrawSyncing = false;
 
     this.withdrawLockDisplay = root.querySelector('[data-withdraw-lock]');
     this.withdrawTokenDisplay = root.querySelector('[data-withdraw-token]');
@@ -118,22 +124,11 @@ export class LockActionToasts {
 
     clearFormErrors([this.withdrawAmountInput, this.withdrawPercentInput, this.withdrawToInput]);
 
-    this.withdrawAmountInput?.addEventListener('input', () => {
-      clearFieldError(this.withdrawAmountInput);
-      if ((this.withdrawAmountInput.value || '').trim()) {
-        if (this.withdrawPercentInput) this.withdrawPercentInput.value = '';
-      }
-    });
-    this.withdrawPercentInput?.addEventListener('input', () => {
-      clearFieldError(this.withdrawPercentInput);
-      if ((this.withdrawPercentInput.value || '').trim()) {
-        if (this.withdrawAmountInput) this.withdrawAmountInput.value = '';
-      }
-    });
+    this.withdrawAmountInput?.addEventListener('input', () => this._handleWithdrawAmountInput());
+    this.withdrawPercentInput?.addEventListener('input', () => this._handleWithdrawPercentInput());
     this.withdrawToInput?.addEventListener('input', () => clearFieldError(this.withdrawToInput));
     this.withdrawMaxBtn?.addEventListener('click', () => {
-      this.withdrawPercentInput.value = '100';
-      this.withdrawAmountInput.value = '';
+      this._handleWithdrawMaxClick();
     });
     this.withdrawSubmitBtn?.addEventListener('click', () => this._submitWithdraw());
   }
@@ -483,10 +478,12 @@ export class LockActionToasts {
       }
       const available = await window.contractManager.previewWithdrawable(lockId);
       if (available == null) return;
+      this._withdrawAvailable = available;
       const formatted = window.ethers.utils.formatUnits(available, this._tokenMeta.decimals || 18);
       if (this.withdrawAvailableDisplay) {
         this.withdrawAvailableDisplay.textContent = formatted;
       }
+      this._syncWithdrawFromSource();
     } catch (err) {
       const msg = normalizeErrorMessage(extractErrorMessage(err, 'Failed to fetch available amount'));
       window.toastManager?.error(msg, { title: 'Load failed' });
@@ -508,14 +505,13 @@ export class LockActionToasts {
         amountStr,
         percentStr,
         to,
-        hasAmount,
-        hasPercent,
+        source,
       } = validation.values;
 
       let amount = window.ethers.BigNumber.from(0);
       let percent = 0;
 
-      if (hasAmount) {
+      if (source === 'amount') {
         await this._ensureTokenMeta(this._lock.token);
         amount = window.ethers.utils.parseUnits(amountStr, this._tokenMeta.decimals || 18);
         percent = 0;
@@ -779,12 +775,14 @@ export class LockActionToasts {
     let ok = true;
     const hasAmount = amountStr !== '';
     const hasPercent = percentStr !== '';
+    let source = this._withdrawInputSource;
 
-    if (hasAmount && hasPercent) {
-      ok = false;
-      setFieldError(this.withdrawAmountInput, 'Use amount or percent, not both.');
-      setFieldError(this.withdrawPercentInput, 'Use amount or percent, not both.');
+    if (!source) {
+      if (hasAmount && !hasPercent) source = 'amount';
+      if (hasPercent && !hasAmount) source = 'percent';
     }
+    if (source === 'amount' && !hasAmount && hasPercent) source = 'percent';
+    if (source === 'percent' && !hasPercent && hasAmount) source = 'amount';
 
     if (!hasAmount && !hasPercent) {
       ok = false;
@@ -792,7 +790,7 @@ export class LockActionToasts {
       setFieldError(this.withdrawPercentInput, 'Enter an amount or percent.');
     }
 
-    if (hasAmount) {
+    if (source === 'amount') {
       const amount = Number(amountStr);
       if (!Number.isFinite(amount) || amount <= 0) {
         ok = false;
@@ -800,7 +798,7 @@ export class LockActionToasts {
       }
     }
 
-    if (hasPercent) {
+    if (source === 'percent') {
       const pct = Number(percentStr);
       if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
         ok = false;
@@ -824,8 +822,7 @@ export class LockActionToasts {
         amountStr,
         percentStr,
         to,
-        hasAmount,
-        hasPercent,
+        source: source || (hasAmount ? 'amount' : 'percent'),
       },
     };
   }
@@ -1036,6 +1033,124 @@ export class LockActionToasts {
       writeTokenMetaCache(token, resolved);
     }
     return this._tokenMeta;
+  }
+
+  _handleWithdrawAmountInput() {
+    if (!this.withdrawAmountInput) return;
+    clearFieldError(this.withdrawAmountInput);
+    if (this._withdrawSyncing) return;
+    this._withdrawInputSource = 'amount';
+    this._syncWithdrawPercentFromAmount();
+  }
+
+  _handleWithdrawPercentInput() {
+    if (!this.withdrawPercentInput) return;
+    clearFieldError(this.withdrawPercentInput);
+    if (this._withdrawSyncing) return;
+    this._withdrawInputSource = 'percent';
+    this._syncWithdrawAmountFromPercent();
+  }
+
+  _handleWithdrawMaxClick() {
+    if (!this.withdrawPercentInput) return;
+    clearFieldError(this.withdrawPercentInput);
+    this._withdrawInputSource = 'percent';
+    this._withWithdrawSyncing(() => {
+      this.withdrawPercentInput.value = '100';
+    });
+    this._syncWithdrawAmountFromPercent();
+  }
+
+  _syncWithdrawFromSource() {
+    if (this._withdrawInputSource === 'amount') {
+      this._syncWithdrawPercentFromAmount();
+    } else if (this._withdrawInputSource === 'percent') {
+      this._syncWithdrawAmountFromPercent();
+    }
+  }
+
+  _syncWithdrawPercentFromAmount() {
+    if (!this.withdrawAmountInput || !this.withdrawPercentInput) return;
+    const amountStr = (this.withdrawAmountInput.value || '').trim();
+    if (!amountStr) {
+      this._withWithdrawSyncing(() => {
+        this.withdrawPercentInput.value = '';
+      });
+      return;
+    }
+    const percentStr = this._calculatePercentFromAmount(amountStr);
+    this._withWithdrawSyncing(() => {
+      this.withdrawPercentInput.value = percentStr;
+    });
+  }
+
+  _syncWithdrawAmountFromPercent() {
+    if (!this.withdrawAmountInput || !this.withdrawPercentInput) return;
+    const percentStr = (this.withdrawPercentInput.value || '').trim();
+    if (!percentStr) {
+      this._withWithdrawSyncing(() => {
+        this.withdrawAmountInput.value = '';
+      });
+      return;
+    }
+    const amountStr = this._calculateAmountFromPercent(percentStr);
+    this._withWithdrawSyncing(() => {
+      this.withdrawAmountInput.value = amountStr;
+    });
+  }
+
+  _calculatePercentFromAmount(amountStr) {
+    const available = this._withdrawAvailable;
+    if (!available || available.isZero?.() || available.toString?.() === '0') return '';
+    try {
+      const decimals = this._tokenMeta.decimals || 18;
+      const amountBn = window.ethers.utils.parseUnits(amountStr, decimals);
+      if (amountBn.isZero()) return '0';
+      const scaled = amountBn.mul(10000).div(available);
+      return this._formatScaledNumber(scaled, 2);
+    } catch {
+      return '';
+    }
+  }
+
+  _calculateAmountFromPercent(percentStr) {
+    const available = this._withdrawAvailable;
+    if (!available || available.isZero?.() || available.toString?.() === '0') return '';
+    const pct = Number(percentStr);
+    if (!Number.isFinite(pct) || pct <= 0) return '';
+    const pctScaled = Math.round(pct * 100);
+    try {
+      const amountBn = available.mul(pctScaled).div(10000);
+      const decimals = this._tokenMeta.decimals || 18;
+      const formatted = window.ethers.utils.formatUnits(amountBn, decimals);
+      return this._trimTrailingZeros(formatted);
+    } catch {
+      return '';
+    }
+  }
+
+  _formatScaledNumber(value, decimals) {
+    const raw = String(value);
+    if (decimals <= 0) return raw;
+    const padded = raw.padStart(decimals + 1, '0');
+    const intPart = padded.slice(0, -decimals);
+    const fracRaw = padded.slice(-decimals);
+    const frac = fracRaw.replace(/0+$/, '');
+    return frac ? `${intPart}.${frac}` : intPart;
+  }
+
+  _trimTrailingZeros(value) {
+    if (!value.includes('.')) return value;
+    return value.replace(/\.?0+$/, '');
+  }
+
+  _withWithdrawSyncing(fn) {
+    this._withdrawSyncing = true;
+    try {
+      fn();
+    } finally {
+      this._withdrawSyncing = false;
+    }
   }
 
   _setWithdrawTokenDisplay(token) {
