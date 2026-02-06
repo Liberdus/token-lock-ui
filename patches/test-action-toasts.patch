@@ -1,0 +1,36 @@
+diff --git a/js/components/overview-tab.js b/js/components/overview-tab.js
+index cc6f604..438f096 100644
+--- a/js/components/overview-tab.js
++++ b/js/components/overview-tab.js
+@@ -746,7 +746,6 @@ export class OverviewTab {
+     const reason = this._getUnlockUnavailableReason(lock);
+     if (reason) {
+       this._showActionUnavailable(reason);
+-      return;
+     }
+     window.lockActionToasts?.openUnlockToast?.({ lockId: id });
+   }
+@@ -758,7 +757,6 @@ export class OverviewTab {
+     const reason = this._getRetractUnavailableReason(lock);
+     if (reason) {
+       this._showActionUnavailable(reason);
+-      return;
+     }
+     window.lockActionToasts?.openRetractToast?.({ lockId: id });
+   }
+@@ -771,7 +769,6 @@ export class OverviewTab {
+     const reason = this._getWithdrawUnavailableReason(lock, entry?.available ?? null);
+     if (reason) {
+       this._showActionUnavailable(reason);
+-      return;
+     }
+ 
+     if (entry && (entry.available == null)) {
+@@ -781,7 +778,6 @@ export class OverviewTab {
+         const refreshedReason = this._getWithdrawUnavailableReason(lock, available);
+         if (refreshedReason) {
+           this._showActionUnavailable(refreshedReason);
+-          return;
+         }
+       } catch {
+         // Ignore preview errors and allow the withdraw form to load.
