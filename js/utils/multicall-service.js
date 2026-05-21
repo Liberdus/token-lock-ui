@@ -10,13 +10,6 @@ const MULTICALL2_ABI = [
   'function tryAggregate(bool requireSuccess, tuple(address target, bytes callData)[] calls) view returns (tuple(bool success, bytes returnData)[])',
 ];
 
-const MULTICALL2_ADDRESSES = {
-  1: '0x5BA1e12693Dc8F9c48aAD8770482f4739bEeD696',
-  137: '0x275617327c958bD06b5D6b871E7f491D76113dd8',
-  80002: '0xcA11bde05977b3631167028862bE2a173976CA11',
-  31337: '0xcA11bde05977b3631167028862bE2a173976CA11',
-};
-
 export class MulticallService {
   constructor() {
     this.provider = null;
@@ -26,11 +19,11 @@ export class MulticallService {
     this.isAvailable = false;
   }
 
-  async initialize(provider, chainId) {
+  async initialize(provider, chainId, { address } = {}) {
     if (!window.ethers) throw new Error('Ethers.js not loaded');
     this.provider = provider;
     this.chainId = chainId;
-    this.multicallAddress = MULTICALL2_ADDRESSES[chainId] || null;
+    this.multicallAddress = address || null;
 
     if (!this.multicallAddress) {
       this.isAvailable = false;
@@ -100,6 +93,3 @@ export class MulticallService {
     return null;
   }
 }
-
-export { MULTICALL2_ADDRESSES };
-

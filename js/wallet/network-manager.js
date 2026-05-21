@@ -3,7 +3,7 @@ import { peekReadOnlyProvider } from '../utils/read-only-provider.js';
 
 /**
  * NetworkManager (Phase 2)
- * Polygon Amoy-only:
+ * Single configured network:
  * - Read-only mode uses CONFIG.NETWORK.RPC_URL
  * - Tx-enabled mode requires MetaMask connected AND chainId === CONFIG.NETWORK.CHAIN_ID
  */
@@ -75,17 +75,21 @@ export class NetworkManager {
   }
 
   buildNetworkConfig() {
+    const rpcUrls = Array.isArray(CONFIG.NETWORK.RPC_URLS) && CONFIG.NETWORK.RPC_URLS.length
+      ? CONFIG.NETWORK.RPC_URLS
+      : [CONFIG.NETWORK.RPC_URL];
+
     return {
       chainId: this.requiredChainHex,
       chainName: CONFIG.NETWORK.NAME,
-      rpcUrls: [CONFIG.NETWORK.RPC_URL, ...(CONFIG.NETWORK.FALLBACK_RPCS || [])].filter(Boolean),
+      rpcUrls: rpcUrls.filter(Boolean),
       nativeCurrency: CONFIG.NETWORK.NATIVE_CURRENCY,
       blockExplorerUrls: [CONFIG.NETWORK.BLOCK_EXPLORER].filter(Boolean),
     };
   }
 
   networkSymbol() {
-    return CONFIG.NETWORK?.NATIVE_CURRENCY?.symbol || 'POL';
+    return CONFIG.NETWORK?.NATIVE_CURRENCY?.symbol || '';
   }
 
   updateUIState() {

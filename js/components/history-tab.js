@@ -698,7 +698,8 @@ export class HistoryTab {
   _renderTxLink(txHash) {
     const hash = String(txHash || '');
     if (!hash) return '—';
-    const explorer = CONFIG?.NETWORK?.BLOCK_EXPLORER || 'https://polygonscan.com';
+    const explorer = CONFIG?.NETWORK?.BLOCK_EXPLORER || '';
+    if (!explorer) return this._shortAddress(hash);
     const txUrl = `${explorer}/tx/${hash}`;
     return `<a href="${txUrl}" target="_blank" rel="noopener noreferrer" title="${hash}">${this._shortAddress(hash)}</a>`;
   }

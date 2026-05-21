@@ -6,7 +6,8 @@ import { CONFIG } from '../config.js';
  * @returns {string} HTML string with clickable link
  */
 export function formatTxHashLink(txHash) {
-  const explorer = CONFIG?.NETWORK?.BLOCK_EXPLORER || 'https://polygonscan.com';
+  const explorer = CONFIG?.NETWORK?.BLOCK_EXPLORER || '';
+  if (!explorer) return txHash;
   const txUrl = `${explorer}/tx/${txHash}`;
   return `<a href="${txUrl}" target="_blank" rel="noopener noreferrer">${txHash}</a>`;
 }

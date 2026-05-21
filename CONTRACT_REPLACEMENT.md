@@ -1,8 +1,10 @@
 # Contract Replacement Notes
 
-This UI is already wired to the TokenLock contract on Polygon Amoy.
+Network and contract details live in `js/config.js`.
 
-If you redeploy:
-1. Update `js/config.js` with the new contract address.
+If you deploy or redeploy:
+1. Update the matching environment in `js/config.js` with the contract address.
 2. Replace `abi.json` with the new ABI.
-3. Verify the contract on Polygonscan for the read/write UI.
+3. Update `DEPLOYMENT_BLOCK` to the deployment block so history scans stay fast.
+4. Add the test/prod hostnames to `SITE_ENVIRONMENTS`.
+5. Verify the contract on the configured block explorer for the read/write UI.

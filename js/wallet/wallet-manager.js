@@ -155,7 +155,7 @@ export class WalletManager {
         return false;
       }
 
-      this.provider = new window.ethers.providers.Web3Provider(window.ethereum);
+      this.provider = new window.ethers.providers.Web3Provider(window.ethereum, 'any');
       this.signer = this.provider.getSigner();
       this.address = addr;
 
@@ -197,6 +197,12 @@ export class WalletManager {
   }
 
   _handleChainChanged(chainId) {
+    if (window.ethers && window.ethereum) {
+      this.provider = new window.ethers.providers.Web3Provider(window.ethereum, 'any');
+      this.signer = this.provider.getSigner();
+      this.connector.provider = this.provider;
+      this.connector.signer = this.signer;
+    }
     this.chainId = Number(chainId);
     this._storeConnectionInfo();
     this._notify('chainChanged', { address: this.address, chainId: this.chainId });
@@ -250,4 +256,3 @@ export class WalletManager {
     }
   }
 }
-

@@ -300,7 +300,9 @@ export class ContractManager {
     if (!provider || !window.ethers) return false;
 
     this._multicallInitPromise = this.multicall
-      .initialize(provider, Number(CONFIG?.NETWORK?.CHAIN_ID))
+      .initialize(provider, Number(CONFIG?.NETWORK?.CHAIN_ID), {
+        address: CONFIG?.NETWORK?.MULTICALL2_ADDRESS || '',
+      })
       .catch(() => false)
       .finally(() => {
         this._multicallInitPromise = null;

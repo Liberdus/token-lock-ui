@@ -1,3 +1,5 @@
+import { CONFIG } from '../config.js';
+
 export class Header {
   constructor() {
     this.connectWalletBtn = null;
@@ -10,10 +12,9 @@ export class Header {
 
     this._connectBtnText = this.connectWalletBtn.textContent?.trim() || this._connectBtnText;
 
-    // Phase 2: MetaMask-only connection (Amoy-only tx)
+    // MetaMask-only connection for the configured network.
     this.connectWalletBtn.addEventListener('click', () => this.onConnectWalletClick());
 
-    // React to wallet events
     document.addEventListener('walletConnected', () => this.updateConnectButtonStatus());
     document.addEventListener('walletDisconnected', () => this.updateConnectButtonStatus());
     document.addEventListener('walletAccountChanged', () => this.updateConnectButtonStatus());
@@ -29,42 +30,37 @@ export class Header {
     const walletManager = window.walletManager;
     const networkManager = window.networkManager;
     const walletPopup = window.walletPopup;
+    const networkName = CONFIG?.NETWORK?.NAME || 'required network';
 
-    // No MetaMask
     if (!window.ethereum || !window.ethereum.isMetaMask) {
-      window.alert('MetaMask is required for this app (Phase 2).');
+      window.alert('MetaMask is required for this app.');
       return;
     }
 
-    // Connecting
     if (walletManager?.isConnecting) {
       return;
     }
 
-    // Connected + on required network → show popup
     if (walletManager?.isConnected?.() && networkManager?.isOnRequiredNetwork?.()) {
       walletPopup?.toggle?.(btn);
       return;
     }
 
-    // Connected but wrong network → add/switch to required network
     if (walletManager?.isConnected?.() && !networkManager?.isOnRequiredNetwork?.()) {
-      this.renderConnectButton({ text: 'Connecting to Amoy…', disabled: true });
+      this.renderConnectButton({ text: `Connecting to ${networkName}...`, disabled: true });
       try {
         await networkManager.ensureRequiredNetwork();
       } catch (e) {
-        window.alert('Please connect to Polygon Amoy in MetaMask.');
+        window.alert(`Please connect to ${networkName} in MetaMask.`);
       } finally {
         this.updateConnectButtonStatus();
       }
       return;
     }
 
-    // Not connected → connect
-    this.renderConnectButton({ text: 'Connecting…', disabled: true });
+    this.renderConnectButton({ text: 'Connecting...', disabled: true });
     try {
       await walletManager?.connectMetaMask?.();
-      // If connected but wrong network, keep simple: user can click again to switch.
     } catch (e) {
       window.alert(e?.message || 'Failed to connect wallet');
     } finally {
@@ -78,28 +74,27 @@ export class Header {
 
     if (!this.connectWalletBtn) return;
 
-    // MetaMask not installed
     if (!window.ethereum || !window.ethereum.isMetaMask) {
       this.renderConnectButton({ text: 'Install MetaMask', disabled: false });
       return;
     }
 
     if (walletManager?.isConnecting) {
-      this.renderConnectButton({ text: 'Connecting…', disabled: true });
+      this.renderConnectButton({ text: 'Connecting...', disabled: true });
       return;
     }
 
     const isConnected = !!walletManager?.isConnected?.();
     const address = walletManager?.getAddress?.();
-    const onPolygon = !!networkManager?.isOnRequiredNetwork?.();
+    const onRequiredNetwork = !!networkManager?.isOnRequiredNetwork?.();
 
     if (!isConnected) {
       this.renderConnectButton({ text: 'Connect Wallet', disabled: false });
       return;
     }
 
-    if (!onPolygon) {
-      this.renderConnectButton({ text: 'Connect to Amoy', disabled: false });
+    if (!onRequiredNetwork) {
+      this.renderConnectButton({ text: `Connect to ${CONFIG?.NETWORK?.NAME || 'Network'}`, disabled: false });
       return;
     }
 

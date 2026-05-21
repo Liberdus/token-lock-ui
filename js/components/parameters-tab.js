@@ -198,10 +198,11 @@ export class ParametersTab {
     const display = addr ? shortAddress(addr) : '—';
     
     if (addr) {
-      // Create clickable link to block explorer
-      const explorer = CONFIG?.NETWORK?.BLOCK_EXPLORER || 'https://polygonscan.com';
+      const explorer = CONFIG?.NETWORK?.BLOCK_EXPLORER || '';
       const explorerUrl = `${explorer}/address/${addr}`;
-      el.innerHTML = `<a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" title="${addr}">${display}</a>`;
+      el.innerHTML = explorer
+        ? `<a href="${explorerUrl}" target="_blank" rel="noopener noreferrer" title="${addr}">${display}</a>`
+        : display;
     } else {
       el.textContent = display;
       el.removeAttribute('title');
@@ -261,4 +262,3 @@ function shortAddress(addr) {
   if (!addr || addr.length < 10) return addr;
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
-
