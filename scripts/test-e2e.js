@@ -1,37 +1,42 @@
-import { spawn } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import path from 'path';
 import process from 'process';
 import waitOn from 'wait-on';
 
 const uiRoot = path.resolve(process.cwd());
 const contractRepo = path.resolve(uiRoot, '..', 'token-lock-contract');
-const hardhatCmd = 'npx';
+const hardhatCli = path.join(contractRepo, 'node_modules', 'hardhat', 'internal', 'cli', 'bootstrap.js');
+const playwrightCli = path.join(uiRoot, 'node_modules', '@playwright', 'test', 'cli.js');
 
 let hardhatProc;
 let serverProc;
 
-function run(cmd, args, cwd, opts = {}) {
+function runNodeScript(scriptPath, args, cwd, opts = {}) {
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { cwd, stdio: 'inherit', env: { ...process.env, ...opts.env } });
+    const p = spawn(process.execPath, [scriptPath, ...args], {
+      cwd,
+      stdio: 'inherit',
+      env: { ...process.env, ...opts.env },
+    });
     p.on('exit', (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`${cmd} ${args.join(' ')} failed with code ${code}`));
+      else reject(new Error(`${scriptPath} ${args.join(' ')} failed with code ${code}`));
     });
   });
 }
 
 async function main() {
-  hardhatProc = spawn(hardhatCmd, ['hardhat', 'node', '--hostname', '127.0.0.1', '--port', '8545'], {
+  hardhatProc = spawn(process.execPath, [hardhatCli, 'node', '--hostname', '127.0.0.1', '--port', '8545'], {
     cwd: contractRepo,
     stdio: 'inherit',
   });
 
   await waitOn({ resources: ['tcp:127.0.0.1:8545'], timeout: 30_000 });
 
-  await run(hardhatCmd, ['hardhat', 'compile'], contractRepo);
+  await runNodeScript(hardhatCli, ['compile'], contractRepo);
 
   const deployResult = await new Promise((resolve, reject) => {
-    const p = spawn('node', ['scripts/deploy-local.js'], { cwd: uiRoot, stdio: ['ignore', 'pipe', 'inherit'] });
+    const p = spawn(process.execPath, ['scripts/deploy-local.js'], { cwd: uiRoot, stdio: ['ignore', 'pipe', 'inherit'] });
     let out = '';
     p.stdout.on('data', (d) => (out += d.toString()));
     p.on('exit', (code) => {
@@ -53,7 +58,7 @@ async function main() {
     throw new Error('deploy-local did not return tokenLock/mockToken addresses');
   }
 
-  serverProc = spawn('node', ['scripts/serve-test.js'], {
+  serverProc = spawn(process.execPath, ['scripts/serve-test.js'], {
     cwd: uiRoot,
     stdio: 'inherit',
     env: { ...process.env, CONTRACT_ADDRESS: contractAddress, PORT: '4173' },
@@ -79,7 +84,7 @@ async function main() {
     extraArgs.push(arg);
   }
 
-  await run('npx', ['playwright', 'test', ...extraArgs], uiRoot, {
+  await runNodeScript(playwrightCli, ['test', ...extraArgs], uiRoot, {
     env: {
       ...process.env,
       CONTRACT_ADDRESS: contractAddress,
@@ -90,9 +95,18 @@ async function main() {
 }
 
 function shutdown(code = 0) {
-  if (serverProc) serverProc.kill('SIGTERM');
-  if (hardhatProc) hardhatProc.kill('SIGTERM');
+  killChild(serverProc);
+  killChild(hardhatProc);
   process.exit(code);
+}
+
+function killChild(child) {
+  if (!child?.pid) return;
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore' });
+    return;
+  }
+  child.kill('SIGTERM');
 }
 
 process.on('SIGINT', () => shutdown(1));

@@ -127,7 +127,10 @@ function getEthers() {
 async function createReadOnlyProvider() {
   const ethers = getEthers();
 
-  const rpcUrl = CONFIG?.NETWORK?.RPC_URL;
+  const rpcUrls = Array.isArray(CONFIG?.NETWORK?.RPC_URLS) && CONFIG.NETWORK.RPC_URLS.length
+    ? CONFIG.NETWORK.RPC_URLS
+    : [CONFIG?.NETWORK?.RPC_URL];
+  const rpcUrl = rpcUrls.find(Boolean);
   const chainId = Number(CONFIG?.NETWORK?.CHAIN_ID);
   const networkName = CONFIG?.NETWORK?.NAME || 'unknown';
 

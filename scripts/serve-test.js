@@ -2,8 +2,9 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import url from 'url';
+import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(new URL(import.meta.url).pathname);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
 const port = Number(process.env.PORT || 4173);
 const contractAddress = process.env.CONTRACT_ADDRESS || '';
@@ -18,13 +19,15 @@ const mime = {
 };
 
 const configJs = `export const CONFIG = {
-  APP: { NAME: 'Liberdus Token Lock', VERSION: '0.0.0', PREFETCH_ON_IDLE: false },
+  APP: { NAME: 'Liberdus Token Lock', VERSION: '0.0.0', PREFETCH_ON_IDLE: false, ENVIRONMENT: 'hardhat' },
   NETWORK: {
     CHAIN_ID: 31337,
     NAME: 'Hardhat',
     RPC_URL: 'http://127.0.0.1:8545',
+    RPC_URLS: ['http://127.0.0.1:8545'],
     BLOCK_EXPLORER: '',
     NATIVE_CURRENCY: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+    MULTICALL2_ADDRESS: '',
   },
   CONTRACT: {
     ADDRESS: '${contractAddress}',

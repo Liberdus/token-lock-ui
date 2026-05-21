@@ -48,7 +48,7 @@ export class MetaMaskConnector {
     this.account = accounts[0];
     this.chainId = await this._readChainId();
 
-    this.provider = new window.ethers.providers.Web3Provider(window.ethereum);
+    this.provider = new window.ethers.providers.Web3Provider(window.ethereum, 'any');
     this.signer = this.provider.getSigner();
     this.isConnected = true;
 
@@ -146,6 +146,10 @@ export class MetaMaskConnector {
 
     this._boundChainChanged = (chainIdHex) => {
       this.chainId = this._hexToNumber(chainIdHex);
+      if (window.ethers) {
+        this.provider = new window.ethers.providers.Web3Provider(window.ethereum, 'any');
+        this.signer = this.provider.getSigner();
+      }
       if (typeof this.onChainChanged === 'function') this.onChainChanged(this.chainId);
     };
 
@@ -185,4 +189,3 @@ export class MetaMaskConnector {
     return '0x' + Number(num).toString(16);
   }
 }
-
