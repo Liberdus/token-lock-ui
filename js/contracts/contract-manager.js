@@ -133,6 +133,14 @@ export class ContractManager {
     return this.provider || this.readOnlyProvider;
   }
 
+  async getLatestBlockTimestamp() {
+    const provider = this.getReadContract()?.provider || this.getProvider?.();
+    if (!provider?.getBlock) return null;
+    const block = await provider.getBlock('latest');
+    const timestamp = Number(block?.timestamp?.toString?.() ?? block?.timestamp ?? 0);
+    return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : null;
+  }
+
   async getNextLockId() {
     const contract = this.getReadContract();
     if (!contract) return null;

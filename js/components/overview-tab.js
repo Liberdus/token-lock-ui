@@ -17,6 +17,7 @@ export class OverviewTab {
     this._scanInFlight = false;
     this._hasLoaded = false;
     this._currentPage = 1;
+    this._chainTimestamp = null;
   }
 
   load() {
@@ -241,6 +242,7 @@ export class OverviewTab {
     this._refreshTokenFilterOptions();
     await this._primeTokenMeta();
     await this._primeAvailable();
+    await this._refreshChainTimestamp();
     this._resetAndRender();
   }
 
@@ -408,7 +410,7 @@ export class OverviewTab {
     const cliffEnd = unlockTime > 0 ? unlockTime + cliffDays * SECONDS_PER_DAY : null;
     const vestingDays = ratePerDay > 0 ? Math.ceil(RATE_SCALE / ratePerDay) : 0;
     const vestingEnd = cliffEnd ? cliffEnd + vestingDays * SECONDS_PER_DAY : null;
-    const now = Math.floor(Date.now() / 1000);
+    const now = this._getCurrentTimestamp();
     let vestingProgressPct = 0;
     if (vestingEnd && cliffEnd) {
       if (now <= cliffEnd) {
@@ -768,23 +770,29 @@ export class OverviewTab {
     if (!Number.isFinite(id) || id < 0) return;
     const entry = this._locks.find((item) => item.id === id) || null;
     const lock = entry?.lock || this._lockIndex.get(id);
-    const reason = this._getWithdrawUnavailableReason(lock, entry?.available ?? null);
+    await this._refreshChainTimestamp();
+    const reason = this._getWithdrawUnavailableReason(lock, null);
     if (reason) {
       this._showActionUnavailable(reason);
       return;
     }
 
-    if (entry && (entry.available == null)) {
+    if (entry) {
       try {
         const available = await window.contractManager.previewWithdrawable(id);
         entry.available = available;
+        await this._refreshChainTimestamp();
         const refreshedReason = this._getWithdrawUnavailableReason(lock, available);
         if (refreshedReason) {
           this._showActionUnavailable(refreshedReason);
           return;
         }
       } catch {
-        // Ignore preview errors and allow the withdraw form to load.
+        const fallbackReason = this._getWithdrawUnavailableReason(lock, entry.available ?? null);
+        if (fallbackReason) {
+          this._showActionUnavailable(fallbackReason);
+          return;
+        }
       }
     }
 
@@ -805,6 +813,26 @@ export class OverviewTab {
     const withdrawAddress = lock.withdrawAddress?.toLowerCase?.() || '';
     const creatorAddress = lock.creator?.toLowerCase?.() || '';
     return withdrawAddress === me || (withdrawAddress === ZERO_ADDRESS && creatorAddress === me);
+  }
+
+  _getCurrentTimestamp() {
+    const chainNow = Number(this._chainTimestamp);
+    if (Number.isFinite(chainNow) && chainNow > 0) return Math.floor(chainNow);
+    return Math.floor(Date.now() / 1000);
+  }
+
+  async _refreshChainTimestamp() {
+    try {
+      const timestamp = await window.contractManager?.getLatestBlockTimestamp?.();
+      if (Number.isFinite(timestamp) && timestamp > 0) {
+        this._chainTimestamp = Math.floor(timestamp);
+        return this._chainTimestamp;
+      }
+    } catch {
+      // Fall back to browser time when the latest block cannot be read.
+    }
+    this._chainTimestamp = null;
+    return this._getCurrentTimestamp();
   }
 
   _getUnlockUnavailableReason(lock) {
@@ -832,7 +860,7 @@ export class OverviewTab {
     if (!this._isWithdrawer(lock)) return 'Only the withdraw address can withdraw.';
     if (!lock.unlocked) return 'This lock is not unlocked.';
 
-    const now = Math.floor(Date.now() / 1000);
+    const now = this._getCurrentTimestamp();
     const unlockTime = Number(lock.unlockTime?.toString?.() ?? lock.unlockTime ?? 0);
     const cliffDays = Number(lock.cliffDays?.toString?.() ?? lock.cliffDays ?? 0);
     if (unlockTime > now) return 'Unlock time has not been reached.';

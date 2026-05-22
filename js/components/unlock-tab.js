@@ -52,14 +52,15 @@ export class LockActionToasts {
     this.unlockTimeInput = root.querySelector('[data-unlock-time]');
     this.submitBtn = root.querySelector('[data-unlock-submit]');
     this._activeLockId = Number.isFinite(lockId) ? Number(lockId) : lockId;
-    const earliestUnlockTime = Math.floor(Date.now() / 1000) + UNLOCK_TIME_BUFFER_SECONDS;
+    const earliestUnlockTime = this._getBrowserTimestamp() + UNLOCK_TIME_BUFFER_SECONDS;
     this._setUnlockInputMin(earliestUnlockTime);
     this._setUnlockInputValue(this._getLocalDateTimeString(new Date(earliestUnlockTime * 1000)));
+    this._applyUnlockInputMinFromChain({ adjustValue: true }).catch(() => {});
 
     clearFormErrors([this.unlockTimeInput]);
     this.unlockTimeInput?.addEventListener('input', () => {
       clearFieldError(this.unlockTimeInput);
-      this._enforceUnlockTimeMin();
+      this._enforceUnlockTimeMin().catch(() => {});
     });
     this.submitBtn?.addEventListener('click', () => this._submitUnlock());
   }
@@ -375,7 +376,7 @@ export class LockActionToasts {
       const lockId = Number(this._activeLockId);
       if (!Number.isFinite(lockId) || lockId < 0) throw new Error('Invalid lock ID');
 
-      const chainNow = await this._getChainTimestamp();
+      const chainNow = await this._getChainTimestamp({ fallback: this._getBrowserTimestamp() });
       const minUnlockTime = chainNow + UNLOCK_TIME_BUFFER_SECONDS;
       let unlockTime = validation.values.unlockTime;
       if (unlockTime < minUnlockTime) {
@@ -405,20 +406,28 @@ export class LockActionToasts {
     }
   }
 
-  _setUnlockInputMin(minSeconds = Math.floor(Date.now() / 1000) + UNLOCK_TIME_BUFFER_SECONDS) {
+  _setUnlockInputMin(minSeconds = this._getBrowserTimestamp() + UNLOCK_TIME_BUFFER_SECONDS) {
     if (!this.unlockTimeInput) return;
     this.unlockTimeInput.min = this._getLocalDateTimeString(new Date(minSeconds * 1000));
   }
 
-  _enforceUnlockTimeMin() {
+  async _enforceUnlockTimeMin() {
     if (!this.unlockTimeInput || !this.unlockTimeInput.value) return;
-    const selected = this._parseUnlockInputToSeconds();
-    if (!Number.isFinite(selected)) return;
-    const minSeconds = Math.floor(Date.now() / 1000) + UNLOCK_TIME_BUFFER_SECONDS;
+    await this._applyUnlockInputMinFromChain({ adjustValue: true });
+  }
+
+  async _applyUnlockInputMinFromChain({ adjustValue = false } = {}) {
+    if (!this.unlockTimeInput) return null;
+    const minSeconds = (await this._getChainTimestamp({ fallback: this._getBrowserTimestamp() }))
+      + UNLOCK_TIME_BUFFER_SECONDS;
     this._setUnlockInputMin(minSeconds);
-    if (selected < minSeconds) {
+    if (!adjustValue) return minSeconds;
+
+    const selected = this._parseUnlockInputToSeconds();
+    if (!Number.isFinite(selected) || selected < minSeconds) {
       this._setUnlockInputValue(this._getLocalDateTimeString(new Date(minSeconds * 1000)));
     }
+    return minSeconds;
   }
 
   _parseUnlockInputToSeconds() {
@@ -444,10 +453,18 @@ export class LockActionToasts {
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   }
 
-  async _getChainTimestamp() {
-    const provider = window.contractManager.getReadContract()?.provider || window.contractManager.getProvider?.();
-    const block = await provider.getBlock('latest');
-    return Number(block.timestamp);
+  _getBrowserTimestamp() {
+    return Math.floor(Date.now() / 1000);
+  }
+
+  async _getChainTimestamp({ fallback = null } = {}) {
+    try {
+      const timestamp = await window.contractManager?.getLatestBlockTimestamp?.();
+      if (Number.isFinite(timestamp) && timestamp > 0) return Math.floor(timestamp);
+    } catch {
+      // Fall back below when the latest block cannot be read.
+    }
+    return fallback;
   }
 
   async _loadWithdrawLock() {
