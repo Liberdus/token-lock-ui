@@ -4,6 +4,8 @@ const MOCK_ACCOUNT = '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266';
 const MOCK_WITHDRAW_ACCOUNT = '0x70997970c51812dc3a010c7d01b50e0d17dc79c8';
 const CHAIN_ID_HEX = '0x7a69';
 const MOCK_TOKEN_ADDRESS = process.env.MOCK_TOKEN_ADDRESS;
+const RATE_SCALE = 1_000_000_000_000;
+const SECONDS_PER_DAY = 86400;
 
 const installMockProvider = ({ mockAccount, chainIdHex }) => {
   window.ethereum = {
@@ -126,6 +128,36 @@ test('renders primary tabs', async ({ page }) => {
   await expect(page.getByRole('tab', { name: /History/i })).toBeVisible();
   await expect(page.getByRole('tab', { name: /Parameters/i })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Lock' })).toBeVisible();
+});
+
+test('next release skips rounded-zero vesting steps', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForFunction(() => window.overviewTab?._getNextRelease && window.ethers?.BigNumber?.from);
+
+  const release = await page.evaluate(({ rateScale, secondsPerDay }) => {
+    const cliffEnd = 1_000_000;
+    const releaseInfo = window.overviewTab._getNextRelease({
+      amount: window.ethers.BigNumber.from(3),
+      withdrawn: window.ethers.BigNumber.from(0),
+    }, {
+      now: cliffEnd + secondsPerDay,
+      cliffEnd,
+      vestingDays: 10,
+      ratePerDay: rateScale / 10,
+    });
+
+    return {
+      at: releaseInfo?.at,
+      amount: releaseInfo?.amount?.toString?.(),
+      isFirstRelease: releaseInfo?.isFirstRelease,
+    };
+  }, { rateScale: RATE_SCALE, secondsPerDay: SECONDS_PER_DAY });
+
+  expect(release).toEqual({
+    at: 1_000_000 + (4 * SECONDS_PER_DAY),
+    amount: '1',
+    isFirstRelease: true,
+  });
 });
 
 test('history tab loads on demand', async ({ page }) => {
@@ -252,6 +284,11 @@ test('cliff prevents withdraw before it ends', async ({ page }) => {
   await page.waitForFunction((id) => {
     return !!window.overviewTab?._lockIndex?.get?.(Number(id));
   }, lockId);
+  const card = page.locator('.lock-card', { hasText: `Lock #${lockId}` });
+  await card.getByRole('button', { name: 'Lock Details' }).click();
+  await expect(card.locator('.lock-kv', { hasText: 'Cliff' }).getByText(/End(?:s|ed) \d{1,2}\/\d{1,2}\/\d{4}/)).toBeVisible();
+  await expect(card.locator('.lock-kv', { hasText: 'Vesting duration' }).getByText(/End(?:s|ed) \d{1,2}\/\d{1,2}\/\d{4}/)).toBeVisible();
+  await expect(card.getByText(/Next release:/)).toBeVisible();
 
   await page.evaluate(async (id) => {
     await window.overviewTab?._openWithdrawToast?.(id);
@@ -282,6 +319,7 @@ test('partial withdrawal by percent updates withdrawn amount', async ({ page }) 
   await page.locator('[data-overview-refresh]').click();
 
   const card = page.locator('.lock-card', { hasText: `Lock #${lockId}` });
+  await expect(card.locator('.lock-vesting-marker--end .lock-vesting-marker-label')).toHaveText('Fully vested');
   await expect.poll(async () => {
     const raw = await card.locator('.lock-progress--vesting .lock-progress-value').textContent();
     return Number((raw || '0').replace('%', ''));

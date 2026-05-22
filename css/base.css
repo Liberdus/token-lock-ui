@@ -483,6 +483,22 @@ textarea:focus-visible {
   margin-top: 2px;
 }
 
+.field-input--stack {
+  display: grid;
+  gap: 2px;
+}
+
+.field-input--stack > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.field-input-subtitle {
+  color: var(--secondary-text-color);
+  font-size: var(--font-size-xs);
+  line-height: 1.25;
+}
+
 .lock-address {
   display: flex;
   align-items: center;
