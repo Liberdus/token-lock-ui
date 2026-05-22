@@ -34,8 +34,8 @@ const ENVIRONMENTS = {
       MULTICALL2_ADDRESS: '0xcA11bde05977b3631167028862bE2a173976CA11',
     },
     CONTRACT: {
-      ADDRESS: '',
-      DEPLOYMENT_BLOCK: 0,
+      ADDRESS: '0xb9033f4ceB73798CA00D1cb461BD39D294B3f2F0',
+      DEPLOYMENT_BLOCK: 99817280,
     },
   },
 
@@ -77,6 +77,7 @@ const ENVIRONMENTS = {
 };
 
 const SITE_ENVIRONMENTS = {
+  'liberdus.com': 'bnbmainnet',
   localhost: 'bnbtestnet',
   '127.0.0.1': 'bnbtestnet',
   // Add deployed hosts here, for example:
@@ -86,7 +87,7 @@ const SITE_ENVIRONMENTS = {
   // 'hardhat.localhost': 'hardhat',
 };
 
-const DEFAULT_ENVIRONMENT = 'bnbtestnet';
+const DEFAULT_ENVIRONMENT = 'bnbmainnet';
 
 function resolveEnvironmentKey() {
   const search = globalThis.location?.search || '';
