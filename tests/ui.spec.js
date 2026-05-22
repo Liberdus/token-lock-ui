@@ -241,19 +241,11 @@ test('cliff prevents withdraw before it ends', async ({ page }) => {
   });
 
   await unlockLock(page, lockId);
-  const unlockTime = await page.evaluate(async (id) => {
-    const lock = await window.contractManager.getLock(id);
-    return Number(lock.unlockTime?.toString?.() ?? lock.unlockTime ?? 0);
-  }, lockId);
+  await advanceTime(page, 24 * 60 * 60);
 
   // Reloading resets the in-page read-only RPC cache and OverviewTab state.
+  // The browser clock is still behind the chain; Overview should gate from block time.
   await reloadAndReconnect(page);
-
-  // Align UI time with the chain's unlockTime so cliff gating is deterministic even under Hardhat time travel.
-  const fakeNowMs = (unlockTime + 24 * 60 * 60) * 1000;
-  await page.evaluate((ts) => {
-    Date.now = () => ts;
-  }, fakeNowMs);
 
   await page.getByRole('tab', { name: 'Active Locks', exact: true }).click();
   await page.locator('[data-overview-refresh]').click();
@@ -261,8 +253,8 @@ test('cliff prevents withdraw before it ends', async ({ page }) => {
     return !!window.overviewTab?._lockIndex?.get?.(Number(id));
   }, lockId);
 
-  await page.evaluate((id) => {
-    window.overviewTab?._openWithdrawToast?.(id);
+  await page.evaluate(async (id) => {
+    await window.overviewTab?._openWithdrawToast?.(id);
   }, lockId);
 
   await expect(page.getByText('Action unavailable')).toBeVisible();
@@ -288,6 +280,12 @@ test('partial withdrawal by percent updates withdrawn amount', async ({ page }) 
   await reloadAndReconnect(page);
   await page.getByRole('tab', { name: 'Active Locks', exact: true }).click();
   await page.locator('[data-overview-refresh]').click();
+
+  const card = page.locator('.lock-card', { hasText: `Lock #${lockId}` });
+  await expect.poll(async () => {
+    const raw = await card.locator('.lock-progress--vesting .lock-progress-value').textContent();
+    return Number((raw || '0').replace('%', ''));
+  }).toBeGreaterThan(0);
 
   await page.waitForFunction((id) => {
     const entry = window.overviewTab?._locks?.find?.((item) => item.id === Number(id));
