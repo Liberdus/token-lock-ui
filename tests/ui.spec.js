@@ -67,6 +67,13 @@ const reloadAndReconnect = async (page) => {
   await connectWallet(page);
 };
 
+const waitForTabBarReady = async (page) => {
+  await page.waitForFunction(() => {
+    const tabBar = window.tabBar;
+    return !!tabBar && typeof tabBar.switchTab === 'function' && (tabBar.tabButtons?.length || 0) > 0;
+  });
+};
+
 const createLock = async (page, { token, amount, cliffDays, durationDays, withdrawAddress } = {}) => {
   await page.locator('#open-lock-action-btn').click();
   const toast = page.locator('[data-toast-id="lock-form-toast"]');
@@ -162,6 +169,7 @@ test('next release skips rounded-zero vesting steps', async ({ page }) => {
 
 test('history tab loads on demand', async ({ page }) => {
   await page.goto('/');
+  await waitForTabBarReady(page);
   await page.getByRole('tab', { name: 'History' }).click();
   await expect(page.getByRole('button', { name: 'Load history' })).toBeVisible();
   const status = page.locator('[data-history-status]');

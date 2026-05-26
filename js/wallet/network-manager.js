@@ -1,11 +1,12 @@
 import { CONFIG } from '../config.js';
 import { peekReadOnlyProvider } from '../utils/read-only-provider.js';
+import { switchOrAddEthereumChain } from '../../vendor/liberdus-wallet-module/adapters/chain.js';
 
 /**
  * NetworkManager (Phase 2)
  * Single configured network:
  * - Read-only mode uses CONFIG.NETWORK.RPC_URL
- * - Tx-enabled mode requires MetaMask connected AND chainId === CONFIG.NETWORK.CHAIN_ID
+ * - Tx-enabled mode requires a connected wallet on CONFIG.NETWORK.CHAIN_ID
  */
 export class NetworkManager {
   constructor({ walletManager } = {}) {
@@ -20,6 +21,7 @@ export class NetworkManager {
     document.addEventListener('walletDisconnected', () => this.updateUIState());
     document.addEventListener('walletAccountChanged', () => this.updateUIState());
     document.addEventListener('walletChainChanged', () => this.updateUIState());
+    document.addEventListener('walletProvidersChanged', () => this.updateUIState());
 
     // Initial UI state
     this.updateUIState();
@@ -45,30 +47,17 @@ export class NetworkManager {
   }
 
   async ensureRequiredNetwork() {
-    if (!window.ethereum) throw new Error('MetaMask not available');
-    // Try switching; if missing, add then switch.
-    try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: this.requiredChainHex }],
-      });
-      return true;
-    } catch (error) {
-      if (error && error.code === 4902) {
-        await this.addRequiredNetwork();
-        await window.ethereum.request({
-          method: 'wallet_switchEthereumChain',
-          params: [{ chainId: this.requiredChainHex }],
-        });
-        return true;
-      }
-      throw error;
-    }
+    const provider = this.walletManager?.getEip1193Provider?.() || null;
+    if (!provider?.request) throw new Error('Wallet provider not available');
+    await switchOrAddEthereumChain(provider, this.buildNetworkConfig());
+    return true;
   }
 
   async addRequiredNetwork() {
     const networkConfig = this.buildNetworkConfig();
-    await window.ethereum.request({
+    const provider = this.walletManager?.getEip1193Provider?.() || null;
+    if (!provider?.request) throw new Error('Wallet provider not available');
+    await provider.request({
       method: 'wallet_addEthereumChain',
       params: [networkConfig],
     });

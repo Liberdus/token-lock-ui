@@ -12,13 +12,13 @@ export class Header {
 
     this._connectBtnText = this.connectWalletBtn.textContent?.trim() || this._connectBtnText;
 
-    // MetaMask-only connection for the configured network.
     this.connectWalletBtn.addEventListener('click', () => this.onConnectWalletClick());
 
     document.addEventListener('walletConnected', () => this.updateConnectButtonStatus());
     document.addEventListener('walletDisconnected', () => this.updateConnectButtonStatus());
     document.addEventListener('walletAccountChanged', () => this.updateConnectButtonStatus());
     document.addEventListener('walletChainChanged', () => this.updateConnectButtonStatus());
+    document.addEventListener('walletProvidersChanged', () => this.updateConnectButtonStatus());
 
     this.updateConnectButtonStatus();
   }
@@ -31,11 +31,6 @@ export class Header {
     const networkManager = window.networkManager;
     const walletPopup = window.walletPopup;
     const networkName = CONFIG?.NETWORK?.NAME || 'required network';
-
-    if (!window.ethereum || !window.ethereum.isMetaMask) {
-      window.alert('MetaMask is required for this app.');
-      return;
-    }
 
     if (walletManager?.isConnecting) {
       return;
@@ -51,7 +46,7 @@ export class Header {
       try {
         await networkManager.ensureRequiredNetwork();
       } catch (e) {
-        window.alert(`Please connect to ${networkName} in MetaMask.`);
+        window.alert(`Please connect to ${networkName} in your wallet.`);
       } finally {
         this.updateConnectButtonStatus();
       }
@@ -60,9 +55,16 @@ export class Header {
 
     this.renderConnectButton({ text: 'Connecting...', disabled: true });
     try {
-      await walletManager?.connectMetaMask?.();
+      await walletManager?.connectPrimaryWallet?.();
+      if (walletManager?.isConnected?.() && !networkManager?.isOnRequiredNetwork?.()) {
+        this.renderConnectButton({ text: `Connecting to ${networkName}...`, disabled: true });
+        await networkManager.ensureRequiredNetwork();
+      }
     } catch (e) {
-      window.alert(e?.message || 'Failed to connect wallet');
+      const fallbackMessage = walletManager?.walletsLoaded && !walletManager?.hasAvailableWallets?.()
+        ? 'A compatible browser wallet is required for this app.'
+        : 'Failed to connect wallet';
+      window.alert(e?.message || fallbackMessage);
     } finally {
       this.updateConnectButtonStatus();
     }
@@ -74,11 +76,6 @@ export class Header {
 
     if (!this.connectWalletBtn) return;
 
-    if (!window.ethereum || !window.ethereum.isMetaMask) {
-      this.renderConnectButton({ text: 'Install MetaMask', disabled: false });
-      return;
-    }
-
     if (walletManager?.isConnecting) {
       this.renderConnectButton({ text: 'Connecting...', disabled: true });
       return;
@@ -89,7 +86,12 @@ export class Header {
     const onRequiredNetwork = !!networkManager?.isOnRequiredNetwork?.();
 
     if (!isConnected) {
-      this.renderConnectButton({ text: 'Connect Wallet', disabled: false });
+      const hasWallets = !!walletManager?.hasAvailableWallets?.();
+      const walletsLoaded = !!walletManager?.walletsLoaded;
+      this.renderConnectButton({
+        text: walletsLoaded && !hasWallets ? 'Install Wallet' : 'Connect Wallet',
+        disabled: false,
+      });
       return;
     }
 

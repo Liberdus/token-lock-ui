@@ -1,15 +1,52 @@
+import fs from 'fs';
 import { spawn, spawnSync } from 'child_process';
 import path from 'path';
 import process from 'process';
 import waitOn from 'wait-on';
 
 const uiRoot = path.resolve(process.cwd());
-const contractRepo = path.resolve(uiRoot, '..', 'token-lock-contract');
-const hardhatCli = path.join(contractRepo, 'node_modules', 'hardhat', 'internal', 'cli', 'bootstrap.js');
+const DEFAULT_CONTRACT_REPO_URL = 'https://github.com/Liberdus/token-lock-contract';
+const DEFAULT_CONTRACT_REPO_REF = 'main';
+const managedContractRepo = path.join(uiRoot, '.e2e', 'token-lock-contract');
 const playwrightCli = path.join(uiRoot, 'node_modules', '@playwright', 'test', 'cli.js');
 
 let hardhatProc;
 let serverProc;
+
+function pathExists(targetPath) {
+  try {
+    fs.accessSync(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readCommandOutput(command, args, cwd = uiRoot) {
+  const result = spawnSync(command, args, {
+    cwd,
+    encoding: 'utf8',
+  });
+  if (result.error || result.status !== 0) return '';
+  return String(result.stdout || '').trim();
+}
+
+function runCommandSync(command, args, cwd, opts = {}) {
+  const result = spawnSync(command, args, {
+    cwd,
+    stdio: opts.stdio || 'inherit',
+    encoding: opts.encoding || 'utf8',
+    env: { ...process.env, ...opts.env },
+  });
+
+  if (result.error) {
+    throw result.error;
+  }
+  if (result.status !== 0) {
+    throw new Error(`${command} ${args.join(' ')} failed with code ${result.status}`);
+  }
+  return result.stdout || '';
+}
 
 function runNodeScript(scriptPath, args, cwd, opts = {}) {
   return new Promise((resolve, reject) => {
@@ -25,7 +62,105 @@ function runNodeScript(scriptPath, args, cwd, opts = {}) {
   });
 }
 
+function resolveBranchSha(repoUrl, branchName) {
+  if (!branchName) return '';
+  const output = readCommandOutput('git', ['ls-remote', repoUrl, `refs/heads/${branchName}`]);
+  return output.split(/\s+/)[0] || '';
+}
+
+function repoMatchesRef(repoPath, repoUrl, repoRef) {
+  if (!pathExists(path.join(repoPath, '.git'))) return false;
+
+  const currentBranch = readCommandOutput('git', ['rev-parse', '--abbrev-ref', 'HEAD'], repoPath);
+  if (currentBranch === repoRef) return true;
+
+  const localHead = readCommandOutput('git', ['rev-parse', 'HEAD'], repoPath);
+  const remoteHead = resolveBranchSha(repoUrl, repoRef);
+  return !!localHead && !!remoteHead && localHead === remoteHead;
+}
+
+function getConfiguredContractRepo(contractRepoUrl, contractRepoRef) {
+  if (process.env.CONTRACT_REPO) {
+    return path.resolve(uiRoot, process.env.CONTRACT_REPO);
+  }
+
+  const siblingRepo = path.resolve(uiRoot, '..', 'token-lock-contract');
+  if (pathExists(siblingRepo) && repoMatchesRef(siblingRepo, contractRepoUrl, contractRepoRef)) {
+    return siblingRepo;
+  }
+
+  return managedContractRepo;
+}
+
+function getContractRepoUrl() {
+  return process.env.CONTRACT_REPO_URL || DEFAULT_CONTRACT_REPO_URL;
+}
+
+function getCurrentBranchCandidate() {
+  const branchCandidates = [
+    process.env.CONTRACT_REPO_REF,
+    process.env.GITHUB_HEAD_REF,
+    process.env.GITHUB_REF_NAME,
+    readCommandOutput('git', ['branch', '--show-current']),
+  ];
+
+  return branchCandidates
+    .map((value) => String(value || '').trim())
+    .find(Boolean) || '';
+}
+
+function remoteHasBranch(repoUrl, branchName) {
+  if (!branchName) return false;
+  const result = spawnSync('git', ['ls-remote', '--heads', repoUrl, branchName], {
+    cwd: uiRoot,
+    encoding: 'utf8',
+  });
+  if (result.error || result.status !== 0) return false;
+  return String(result.stdout || '').includes(`refs/heads/${branchName}`);
+}
+
+function resolveContractRepoRef(repoUrl) {
+  const preferredBranch = getCurrentBranchCandidate();
+  if (preferredBranch && remoteHasBranch(repoUrl, preferredBranch)) {
+    return preferredBranch;
+  }
+  return DEFAULT_CONTRACT_REPO_REF;
+}
+
+function ensureManagedContractRepo(repoPath, repoUrl, repoRef) {
+  const repoGitDir = path.join(repoPath, '.git');
+  if (!pathExists(repoGitDir)) {
+    fs.mkdirSync(path.dirname(repoPath), { recursive: true });
+    runCommandSync('git', ['clone', '--depth', '1', '--branch', repoRef, repoUrl, repoPath], uiRoot);
+    return;
+  }
+
+  runCommandSync('git', ['fetch', '--depth', '1', 'origin', repoRef], repoPath);
+  runCommandSync('git', ['checkout', '--force', 'FETCH_HEAD'], repoPath);
+}
+
+function ensureContractRepoDependencies(repoPath) {
+  const hardhatCli = path.join(repoPath, 'node_modules', 'hardhat', 'internal', 'cli', 'bootstrap.js');
+  if (pathExists(hardhatCli)) {
+    return hardhatCli;
+  }
+
+  const hasLockfile = pathExists(path.join(repoPath, 'package-lock.json'));
+  runCommandSync('npm', [hasLockfile ? 'ci' : 'install'], repoPath);
+  return hardhatCli;
+}
+
 async function main() {
+  const contractRepoUrl = getContractRepoUrl();
+  const contractRepoRef = resolveContractRepoRef(contractRepoUrl);
+  const contractRepo = getConfiguredContractRepo(contractRepoUrl, contractRepoRef);
+
+  if (contractRepo === managedContractRepo || !pathExists(contractRepo)) {
+    ensureManagedContractRepo(contractRepo, contractRepoUrl, contractRepoRef);
+  }
+
+  const hardhatCli = ensureContractRepoDependencies(contractRepo);
+
   hardhatProc = spawn(process.execPath, [hardhatCli, 'node', '--hostname', '127.0.0.1', '--port', '8545'], {
     cwd: contractRepo,
     stdio: 'inherit',
@@ -36,7 +171,14 @@ async function main() {
   await runNodeScript(hardhatCli, ['compile'], contractRepo);
 
   const deployResult = await new Promise((resolve, reject) => {
-    const p = spawn(process.execPath, ['scripts/deploy-local.js'], { cwd: uiRoot, stdio: ['ignore', 'pipe', 'inherit'] });
+    const p = spawn(process.execPath, ['scripts/deploy-local.js'], {
+      cwd: uiRoot,
+      stdio: ['ignore', 'pipe', 'inherit'],
+      env: {
+        ...process.env,
+        CONTRACT_REPO: contractRepo,
+      },
+    });
     let out = '';
     p.stdout.on('data', (d) => (out += d.toString()));
     p.on('exit', (code) => {

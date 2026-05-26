@@ -1,6 +1,6 @@
 /**
  * WalletPopup (Phase 2)
- * Simple MetaMask popup:
+ * Simple wallet popup:
  * - address (copy)
  * - balance (native, best-effort)
  * - disconnect
@@ -248,4 +248,3 @@ export class WalletPopup {
     return this.networkManager?.networkSymbol?.() || (this.networkManager ? 'MATIC' : 'MATIC');
   }
 }
-
