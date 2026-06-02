@@ -2,6 +2,7 @@ import { createWalletCore } from '../../vendor/liberdus-wallet-module/index.js';
 
 const DEFAULT_WALLET_SESSION_KEY = 'liberdus_token_ui_wallet_session';
 const LEGACY_WALLET_STORAGE_KEY = 'liberdus_token_ui_wallet_connection';
+const WALLET_SELECTION_REQUIRED = 'WALLET_SELECTION_REQUIRED';
 
 function normalizeChainId(rawChainId) {
   if (typeof rawChainId === 'number' && Number.isFinite(rawChainId)) {
@@ -135,7 +136,7 @@ export class WalletManager {
 
   async connectPrimaryWallet() {
     if (this._connectionPromise) return this._connectionPromise;
-    this._connectionPromise = this._performConnect();
+    this._connectionPromise = this._performConnect(null, { requireSelection: false });
     try {
       return await this._connectionPromise;
     } finally {
@@ -145,7 +146,7 @@ export class WalletManager {
 
   async connectWallet({ walletId } = {}) {
     if (this._connectionPromise) return this._connectionPromise;
-    this._connectionPromise = this._performConnect(walletId);
+    this._connectionPromise = this._performConnect(walletId, { requireSelection: true });
     try {
       return await this._connectionPromise;
     } finally {
@@ -153,7 +154,7 @@ export class WalletManager {
     }
   }
 
-  async _performConnect(walletId = null) {
+  async _performConnect(walletId = null, { requireSelection = false } = {}) {
     if (!window.ethers) {
       throw new Error('Ethers.js not loaded');
     }
@@ -174,9 +175,7 @@ export class WalletManager {
         throw new Error('No compatible browser wallet was detected.');
       }
 
-      const selectedWallet = walletId
-        ? wallets.find((wallet) => wallet.id === walletId)
-        : this._selectPrimaryWallet(wallets);
+      const selectedWallet = await this._selectWalletForConnect(wallets, walletId, { requireSelection });
 
       if (!selectedWallet?.id) {
         throw new Error('The selected wallet is no longer available. Refresh the page and try again.');
@@ -324,6 +323,38 @@ export class WalletManager {
     });
 
     return metamaskWallet || wallets[0] || null;
+  }
+
+  async _selectWalletForConnect(wallets = [], walletId = null, { requireSelection = false } = {}) {
+    if (walletId) {
+      return wallets.find((wallet) => wallet.id === walletId) || null;
+    }
+
+    if (!requireSelection) {
+      return this._selectPrimaryWallet(wallets);
+    }
+
+    if (wallets.length === 1) {
+      return wallets[0];
+    }
+
+    try {
+      await this.walletCore.sync();
+    } catch {
+      // A stale persisted session should not block a fresh wallet choice.
+    }
+
+    const currentState = this.walletCore.getState?.() || {};
+    const sessionWalletId = currentState.sessionWalletId || this.selectedWalletId || null;
+    if (sessionWalletId) {
+      const persistedWallet = wallets.find((wallet) => wallet.id === sessionWalletId);
+      if (persistedWallet) return persistedWallet;
+    }
+
+    const error = new Error('Wallet selection required.');
+    error.code = WALLET_SELECTION_REQUIRED;
+    error.wallets = this.getAvailableWallets();
+    throw error;
   }
 
   _formatAddress(address) {

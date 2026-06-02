@@ -14,7 +14,7 @@ It uses this priority:
 3. a managed clone in `./.e2e/token-lock-contract`
 
 The selected contract ref is resolved in this order:
-1. `CONTRACT_REPO_REF`
+1. `CONTRACT_REPO_REF`, treated as an explicit git ref such as a branch, tag, or full commit SHA
 2. `GITHUB_HEAD_REF`
 3. `GITHUB_REF_NAME`
 4. the current local git branch, if that branch exists in `Liberdus/token-lock-contract`

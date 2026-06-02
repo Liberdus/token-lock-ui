@@ -4,6 +4,7 @@ export class Header {
   constructor() {
     this.connectWalletBtn = null;
     this._connectBtnText = 'Connect Wallet';
+    this._walletPicker = null;
   }
 
   load() {
@@ -19,6 +20,7 @@ export class Header {
     document.addEventListener('walletAccountChanged', () => this.updateConnectButtonStatus());
     document.addEventListener('walletChainChanged', () => this.updateConnectButtonStatus());
     document.addEventListener('walletProvidersChanged', () => this.updateConnectButtonStatus());
+    document.addEventListener('click', (event) => this._onDocumentClick(event));
 
     this.updateConnectButtonStatus();
   }
@@ -55,19 +57,124 @@ export class Header {
 
     this.renderConnectButton({ text: 'Connecting...', disabled: true });
     try {
-      await walletManager?.connectPrimaryWallet?.();
+      await walletManager?.connectWallet?.();
       if (walletManager?.isConnected?.() && !networkManager?.isOnRequiredNetwork?.()) {
         this.renderConnectButton({ text: `Connecting to ${networkName}...`, disabled: true });
         await networkManager.ensureRequiredNetwork();
       }
     } catch (e) {
+      if (e?.code === 'WALLET_SELECTION_REQUIRED') {
+        try {
+          const walletId = await this._pickWallet(e.wallets || []);
+          this.renderConnectButton({ text: 'Connecting...', disabled: true });
+          await walletManager?.connectWallet?.({ walletId });
+          if (walletManager?.isConnected?.() && !networkManager?.isOnRequiredNetwork?.()) {
+            this.renderConnectButton({ text: `Connecting to ${networkName}...`, disabled: true });
+            await networkManager.ensureRequiredNetwork();
+          }
+        } catch (selectionError) {
+          if (selectionError?.message !== 'Wallet selection cancelled.') {
+            window.alert(selectionError?.message || 'Failed to connect wallet');
+          }
+        }
+        return;
+      }
+
       const fallbackMessage = walletManager?.walletsLoaded && !walletManager?.hasAvailableWallets?.()
         ? 'A compatible browser wallet is required for this app.'
         : 'Failed to connect wallet';
       window.alert(e?.message || fallbackMessage);
     } finally {
+      this._closeWalletPicker(false);
       this.updateConnectButtonStatus();
     }
+  }
+
+  _pickWallet(wallets = []) {
+    this._closeWalletPicker(false);
+
+    return new Promise((resolve, reject) => {
+      const navSection = this.connectWalletBtn?.closest('.nav-section');
+      if (!navSection || !wallets.length) {
+        reject(new Error('No compatible browser wallet was detected.'));
+        return;
+      }
+
+      const menu = document.createElement('div');
+      menu.className = 'wallet-picker-menu';
+      menu.setAttribute('role', 'menu');
+      menu.setAttribute('aria-label', 'Choose a wallet');
+
+      const title = document.createElement('div');
+      title.className = 'wallet-picker-menu__title';
+      title.textContent = 'Choose a wallet';
+      menu.appendChild(title);
+
+      for (const wallet of wallets) {
+        const item = document.createElement('button');
+        item.type = 'button';
+        item.className = 'wallet-picker-menu__item';
+        item.setAttribute('role', 'menuitem');
+
+        const name = wallet?.info?.name || 'Wallet';
+        const initials = name
+          .trim()
+          .split(/\s+/)
+          .filter(Boolean)
+          .slice(0, 2)
+          .map((word) => word[0].toUpperCase())
+          .join('') || 'W';
+
+        const icon = document.createElement('span');
+        icon.className = 'wallet-picker-menu__icon';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.textContent = initials;
+
+        const iconUrl = wallet?.info?.icon || '';
+        if (iconUrl) {
+          const image = document.createElement('img');
+          image.alt = '';
+          image.onload = () => icon.replaceChildren(image);
+          image.src = iconUrl;
+          if (image.complete && image.naturalWidth) image.onload();
+        }
+
+        const label = document.createElement('span');
+        label.className = 'wallet-picker-menu__label';
+        label.textContent = name;
+
+        item.append(icon, label);
+        item.addEventListener('click', () => {
+          this._closeWalletPicker(false);
+          resolve(wallet.id);
+        });
+        menu.appendChild(item);
+      }
+
+      navSection.classList.add('has-wallet-picker');
+      navSection.appendChild(menu);
+      this._walletPicker = { menu, reject };
+    });
+  }
+
+  _closeWalletPicker(cancelled = true) {
+    if (!this._walletPicker) return;
+
+    if (cancelled) {
+      this._walletPicker.reject(new Error('Wallet selection cancelled.'));
+    }
+
+    this._walletPicker.menu.remove();
+    this.connectWalletBtn?.closest('.nav-section')?.classList.remove('has-wallet-picker');
+    this._walletPicker = null;
+  }
+
+  _onDocumentClick(event) {
+    if (!this._walletPicker) return;
+    const navSection = this.connectWalletBtn?.closest('.nav-section');
+    if (navSection?.contains(event.target)) return;
+    this._closeWalletPicker();
+    this.updateConnectButtonStatus();
   }
 
   updateConnectButtonStatus() {

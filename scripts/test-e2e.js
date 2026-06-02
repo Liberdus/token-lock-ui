@@ -62,9 +62,13 @@ function runNodeScript(scriptPath, args, cwd, opts = {}) {
   });
 }
 
-function resolveBranchSha(repoUrl, branchName) {
-  if (!branchName) return '';
-  const output = readCommandOutput('git', ['ls-remote', repoUrl, `refs/heads/${branchName}`]);
+function isFullCommitSha(value) {
+  return /^[a-f0-9]{40}$/i.test(String(value || '').trim());
+}
+
+function resolveRemoteRefSha(repoUrl, refName) {
+  if (!refName) return '';
+  const output = readCommandOutput('git', ['ls-remote', repoUrl, refName]);
   return output.split(/\s+/)[0] || '';
 }
 
@@ -75,7 +79,9 @@ function repoMatchesRef(repoPath, repoUrl, repoRef) {
   if (currentBranch === repoRef) return true;
 
   const localHead = readCommandOutput('git', ['rev-parse', 'HEAD'], repoPath);
-  const remoteHead = resolveBranchSha(repoUrl, repoRef);
+  if (isFullCommitSha(repoRef) && localHead === repoRef) return true;
+
+  const remoteHead = resolveRemoteRefSha(repoUrl, repoRef);
   return !!localHead && !!remoteHead && localHead === remoteHead;
 }
 
@@ -98,7 +104,6 @@ function getContractRepoUrl() {
 
 function getCurrentBranchCandidate() {
   const branchCandidates = [
-    process.env.CONTRACT_REPO_REF,
     process.env.GITHUB_HEAD_REF,
     process.env.GITHUB_REF_NAME,
     readCommandOutput('git', ['branch', '--show-current']),
@@ -120,6 +125,11 @@ function remoteHasBranch(repoUrl, branchName) {
 }
 
 function resolveContractRepoRef(repoUrl) {
+  const explicitRef = String(process.env.CONTRACT_REPO_REF || '').trim();
+  if (explicitRef) {
+    return explicitRef;
+  }
+
   const preferredBranch = getCurrentBranchCandidate();
   if (preferredBranch && remoteHasBranch(repoUrl, preferredBranch)) {
     return preferredBranch;
@@ -131,8 +141,11 @@ function ensureManagedContractRepo(repoPath, repoUrl, repoRef) {
   const repoGitDir = path.join(repoPath, '.git');
   if (!pathExists(repoGitDir)) {
     fs.mkdirSync(path.dirname(repoPath), { recursive: true });
-    runCommandSync('git', ['clone', '--depth', '1', '--branch', repoRef, repoUrl, repoPath], uiRoot);
-    return;
+    fs.mkdirSync(repoPath, { recursive: true });
+    runCommandSync('git', ['init'], repoPath);
+    runCommandSync('git', ['remote', 'add', 'origin', repoUrl], repoPath);
+  } else {
+    runCommandSync('git', ['remote', 'set-url', 'origin', repoUrl], repoPath);
   }
 
   runCommandSync('git', ['fetch', '--depth', '1', 'origin', repoRef], repoPath);
