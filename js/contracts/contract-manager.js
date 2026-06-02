@@ -116,11 +116,10 @@ export class ContractManager {
 
   getWriteContract() {
     const txEnabled = !!this.networkManager?.isTxEnabled?.();
-    if (!txEnabled || !window.ethereum || !window.ethers) {
+    const freshProvider = this._getFreshWalletProvider();
+    if (!txEnabled || !freshProvider) {
       return this.contractWrite;
     }
-
-    const freshProvider = new window.ethers.providers.Web3Provider(window.ethereum, 'any');
     const freshSigner = freshProvider.getSigner();
     return this._makeContract(freshSigner);
   }
@@ -333,12 +332,20 @@ export class ContractManager {
 
   async approveToken({ token, spender, amount }) {
     const txEnabled = !!this.networkManager?.isTxEnabled?.();
-    if (!txEnabled || !window.ethereum || !window.ethers) {
+    const provider = this._getFreshWalletProvider();
+    if (!txEnabled || !provider) {
       throw new Error('Wallet not connected');
     }
-    const provider = new window.ethers.providers.Web3Provider(window.ethereum, 'any');
     const signer = provider.getSigner();
     const contract = this._makeErc20Contract(token, signer);
     return contract.approve(spender, amount);
+  }
+
+  _getFreshWalletProvider() {
+    const rawProvider = this.walletManager?.getEip1193Provider?.() || null;
+    if (!rawProvider?.request || !window.ethers?.providers?.Web3Provider) {
+      return null;
+    }
+    return new window.ethers.providers.Web3Provider(rawProvider, 'any');
   }
 }

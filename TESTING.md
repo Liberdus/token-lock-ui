@@ -4,12 +4,29 @@ This UI repo is now a Node project and ships Playwright tests that mock MetaMask
 
 ## Prereqs
 - Node.js
-- Clone the `token-lock-contract` repo so it sits next to this repo:
-  - `../token-lock-contract`
-  - https://github.com/Liberdus/token-lock-contract
-  - ```bash
-    git clone https://github.com/Liberdus/token-lock-contract ../token-lock-contract
-    ```
+- Playwright browser binaries:
+  - `npx playwright install`
+
+The e2e harness now auto-provisions `token-lock-contract` when no matching local checkout is present.
+It uses this priority:
+1. `CONTRACT_REPO` if you set it
+2. `../token-lock-contract` if it already exists and already matches the selected contract ref
+3. a managed clone in `./.e2e/token-lock-contract`
+
+The selected contract ref is resolved in this order:
+1. `CONTRACT_REPO_REF`, treated as an explicit git ref such as a branch, tag, or full commit SHA
+2. `GITHUB_HEAD_REF`
+3. `GITHUB_REF_NAME`
+4. the current local git branch, if that branch exists in `Liberdus/token-lock-contract`
+5. `main`
+
+If the sibling checkout is present but is on a different ref, the harness leaves it alone and uses the managed clone instead.
+
+You can still create the sibling checkout manually if you prefer:
+
+```bash
+git clone https://github.com/Liberdus/token-lock-contract ../token-lock-contract
+```
 
 ## Run Tests (Automated)
 From `token-lock-ui`:
@@ -31,10 +48,12 @@ npm run test:e2e -- --headed --project=chromium --slow-mo=250
 ```
 
 What this does:
-1. Starts a local Hardhat node in `token-lock-contract`
-2. Compiles and deploys TokenLock to the local node
-3. Starts a local static server that proxies JSON-RPC
-4. Runs Playwright tests with a mocked `window.ethereum`
+1. Ensures `token-lock-contract` is available on the selected ref
+2. Installs contract repo dependencies when needed
+3. Starts a local Hardhat node in `token-lock-contract`
+4. Compiles and deploys TokenLock to the local node
+5. Starts a local static server that proxies JSON-RPC
+6. Runs Playwright tests with a mocked `window.ethereum`
 
 ## Manual Hardhat Testing With Live Server
 Use a fresh Hardhat node so the deterministic deployment addresses match `js/config.js`.
