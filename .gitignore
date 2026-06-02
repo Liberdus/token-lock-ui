@@ -23,6 +23,11 @@
 .DS_Store
 *.pem
 
+# unrelated sibling repos accidentally copied into this checkout
+/liberdus-bridge-ui/
+/liberdus-social-signup/
+/otc-web-client/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
