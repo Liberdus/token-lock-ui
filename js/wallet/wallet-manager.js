@@ -225,6 +225,9 @@ export class WalletManager {
 
   _handleWalletCoreEvent(event, data) {
     if (event === 'providersChanged') {
+      if (this.isConnected() && this.walletCore.getState().account) {
+        this._applyState(this.walletCore.getState());
+      }
       this.availableWallets = Array.isArray(data) ? data.map((wallet) => cloneWalletDescriptor(wallet)) : [];
       this.walletsLoaded = true;
       this._notify('providersChanged', { wallets: this.getAvailableWallets() });
