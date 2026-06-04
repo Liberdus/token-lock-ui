@@ -55,7 +55,11 @@ git submodule update --init --recursive "$SUBMODULE_PATH"
 
 if [ -n "$REF" ]; then
   git -C "$SUBMODULE_PATH" fetch origin --tags
-  git -C "$SUBMODULE_PATH" checkout "$REF"
+  CHECKOUT_REF="$REF"
+  if git -C "$SUBMODULE_PATH" show-ref --verify --quiet "refs/remotes/origin/$REF"; then
+    CHECKOUT_REF="origin/$REF"
+  fi
+  git -C "$SUBMODULE_PATH" checkout --detach "$CHECKOUT_REF"
 else
   git submodule update --remote "$SUBMODULE_PATH"
 fi
