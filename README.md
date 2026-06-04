@@ -3,9 +3,24 @@
 Simple UI for the Liberdus TokenLock contract. Uses the Liberdus reference frontend styling.
 
 ## Quick Start
+
+Use any static server (ES modules require HTTP, not `file://`).
+
+Clone with submodules:
+
 ```bash
+git clone --recurse-submodules https://github.com/Liberdus/token-lock-ui.git
+cd token-lock-ui
 python3 -m http.server 8080
 ```
+
+If the repo is already cloned:
+
+```bash
+git submodule update --init --recursive
+python3 -m http.server 8080
+```
+
 Open `http://localhost:8080`.
 
 ## Network + Contract
